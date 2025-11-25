@@ -1,8 +1,18 @@
 from datetime import datetime
 from typing import Optional
-from pymongo import MongoClient
-from pymongo.database import Database
-from bson import ObjectId
+import uuid
+
+try:
+    from pymongo import MongoClient
+    from pymongo.database import Database
+    from bson import ObjectId
+    MONGODB_AVAILABLE = True
+except ImportError:
+    MONGODB_AVAILABLE = False
+    MongoClient = None
+    Database = None
+    ObjectId = None
+
 from config.settings import settings
 
 
@@ -10,11 +20,26 @@ class MongoDBClient:
     def __init__(self):
         self.client: Optional[MongoClient] = None
         self.db: Optional[Database] = None
+        self.connected = False
     
     def connect(self):
+        if not MONGODB_AVAILABLE:
+            print("MongoDB not available - running without persistence")
+            return self
+        
         if not self.client:
-            self.client = MongoClient(settings.mongodb_uri)
-            self.db = self.client[settings.mongodb_database]
+            try:
+                self.client = MongoClient(settings.mongodb_uri, serverSelectionTimeoutMS=2000)
+                # Test connection
+                self.client.admin.command('ping')
+                self.db = self.client[settings.mongodb_database]
+                self.connected = True
+                print("MongoDB connected successfully")
+            except Exception as e:
+                print(f"MongoDB connection failed: {e} - running without persistence")
+                self.client = None
+                self.db = None
+                self.connected = False
         return self
     
     def disconnect(self):
@@ -22,9 +47,12 @@ class MongoDBClient:
             self.client.close()
             self.client = None
             self.db = None
+            self.connected = False
     
     # Sessions
     def create_session(self) -> str:
+        if not self.connected or not self.db:
+            return str(uuid.uuid4())
         result = self.db.sessions.insert_one({
             "created_at": datetime.utcnow(),
             "messages": []
@@ -32,20 +60,32 @@ class MongoDBClient:
         return str(result.inserted_id)
     
     def get_session(self, session_id: str) -> Optional[dict]:
-        return self.db.sessions.find_one({"_id": ObjectId(session_id)})
+        if not self.connected or not self.db:
+            return None
+        try:
+            return self.db.sessions.find_one({"_id": ObjectId(session_id)})
+        except Exception:
+            return None
     
     def add_message_to_session(self, session_id: str, role: str, content: str):
-        self.db.sessions.update_one(
-            {"_id": ObjectId(session_id)},
-            {"$push": {"messages": {
-                "role": role,
-                "content": content,
-                "timestamp": datetime.utcnow()
-            }}}
-        )
+        if not self.connected or not self.db:
+            return
+        try:
+            self.db.sessions.update_one(
+                {"_id": ObjectId(session_id)},
+                {"$push": {"messages": {
+                    "role": role,
+                    "content": content,
+                    "timestamp": datetime.utcnow()
+                }}}
+            )
+        except Exception:
+            pass
     
     # Queries
     def log_query(self, user_query: str, session_id: Optional[str] = None) -> str:
+        if not self.connected or not self.db:
+            return str(uuid.uuid4())
         result = self.db.queries.insert_one({
             "user_query": user_query,
             "session_id": session_id,
@@ -54,6 +94,8 @@ class MongoDBClient:
         return str(result.inserted_id)
     
     def get_queries(self, limit: int = 100) -> list:
+        if not self.connected or not self.db:
+            return []
         cursor = self.db.queries.find().sort("timestamp", -1).limit(limit)
         return [{**doc, "_id": str(doc["_id"])} for doc in cursor]
     
@@ -65,6 +107,8 @@ class MongoDBClient:
         output: str,
         metadata: Optional[dict] = None
     ) -> str:
+        if not self.connected or not self.db:
+            return str(uuid.uuid4())
         result = self.db.agent_outputs.insert_one({
             "query_id": query_id,
             "agent_name": agent_name,
@@ -75,10 +119,14 @@ class MongoDBClient:
         return str(result.inserted_id)
     
     def get_agent_outputs_for_query(self, query_id: str) -> list:
+        if not self.connected or not self.db:
+            return []
         cursor = self.db.agent_outputs.find({"query_id": query_id}).sort("timestamp", 1)
         return [{**doc, "_id": str(doc["_id"])} for doc in cursor]
     
     def get_all_agent_outputs(self, limit: int = 100) -> list:
+        if not self.connected or not self.db:
+            return []
         cursor = self.db.agent_outputs.find().sort("timestamp", -1).limit(limit)
         return [{**doc, "_id": str(doc["_id"])} for doc in cursor]
 
