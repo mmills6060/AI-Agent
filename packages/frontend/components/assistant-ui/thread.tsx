@@ -292,8 +292,7 @@ const UserMessage: FC = () => {
           <UserMessageAttachments />
           
           <div 
-            className="aui-user-message-content border border-border rounded-xl !bg-background !text-foreground px-5 py-2.5 break-words shadow-sm"
-            style={{ backgroundColor: '#111827', color: '#ffffff' }}
+            className="aui-user-message-content border border-border rounded-xl bg-background !text-foreground px-5 py-2.5 break-words shadow-sm"
           >
             <MessagePrimitive.Parts />
           </div>
