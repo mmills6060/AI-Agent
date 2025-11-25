@@ -1,0 +1,16 @@
+# Environment variables
+.env
+.env.local
+.env*.local
+
+# OS
+.DS_Store
+
+# Dependencies
+node_modules/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
