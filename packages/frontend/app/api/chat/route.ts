@@ -1,11 +1,11 @@
-export const maxDuration = 30;
+export const maxDuration = 60
 
-const BACKEND_URL = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
+const BACKEND_URL = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const { messages } = body;
+    const body = await req.json()
+    const { messages, session_id } = body
 
     if (!messages || !Array.isArray(messages)) {
       return new Response(
@@ -14,7 +14,7 @@ export async function POST(req: Request) {
           status: 400,
           headers: { "Content-Type": "application/json" }
         }
-      );
+      )
     }
 
     const backendResponse = await fetch(`${BACKEND_URL}/api/chat`, {
@@ -22,11 +22,11 @@ export async function POST(req: Request) {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ messages }),
-    });
+      body: JSON.stringify({ messages, session_id }),
+    })
 
     if (!backendResponse.ok) {
-      const errorText = await backendResponse.text();
+      const errorText = await backendResponse.text()
       
       return new Response(
         JSON.stringify({ 
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
           status: backendResponse.status,
           headers: { "Content-Type": "application/json" }
         }
-      );
+      )
     }
 
     return new Response(backendResponse.body, {
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
         "Connection": backendResponse.headers.get("Connection") || "keep-alive",
         "X-Accel-Buffering": "no",
       },
-    });
+    })
   } catch (error) {
     return new Response(
       JSON.stringify({ 
@@ -58,6 +58,6 @@ export async function POST(req: Request) {
         status: 500,
         headers: { "Content-Type": "application/json" }
       }
-    );
+    )
   }
 }

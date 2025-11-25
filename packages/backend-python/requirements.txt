@@ -1,0 +1,25 @@
+# Core Framework
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+python-dotenv==1.0.1
+
+# LangChain & LangGraph
+langchain==0.3.9
+langchain-openai==0.2.10
+langgraph==0.2.53
+
+# Tavily API
+tavily-python==0.5.0
+
+# MongoDB
+pymongo==4.9.1
+motor==3.6.0
+
+# Utilities
+pydantic==2.10.2
+pydantic-settings==2.6.1
+httpx==0.28.0
+
+# SSE Streaming
+sse-starlette==2.1.3
+
