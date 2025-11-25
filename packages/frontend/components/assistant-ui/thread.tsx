@@ -235,14 +235,16 @@ const AssistantMessage: FC = () => {
         className="aui-assistant-message-root relative mx-auto w-full max-w-[var(--thread-max-width)] animate-in py-4 duration-150 ease-out fade-in slide-in-from-bottom-1 last:mb-24"
         data-role="assistant"
       >
-        <div className="aui-assistant-message-content mx-2 leading-7 break-words text-foreground">
-          <MessagePrimitive.Parts
-            components={{
-              Text: MarkdownText,
-              tools: { Fallback: ToolFallback },
-            }}
-          />
-          <MessageError />
+        <div className="aui-assistant-message-content-wrapper relative mr-auto flex min-w-0 max-w-[85%] flex-col items-start gap-2">
+          <div className="aui-assistant-message-content bg-card text-card-foreground px-5 py-2.5 rounded-lg break-words shadow-sm leading-7">
+            <MessagePrimitive.Parts
+              components={{
+                Text: MarkdownText,
+                tools: { Fallback: ToolFallback },
+              }}
+            />
+            <MessageError />
+          </div>
         </div>
 
         <div className="aui-assistant-message-footer mt-2 ml-2 flex">

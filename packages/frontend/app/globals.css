@@ -76,89 +76,57 @@
 }
 
 * {
-  border-color: hsl(var(--border));
+  border-color: var(--border);
 }
 
 body {
-  background-color: hsl(var(--background));
-  color: hsl(var(--foreground));
+  background-color: var(--background);
+  color: var(--foreground);
   font-feature-settings: "rlig" 1, "calt" 1;
 }
 
-/* User message styling */
-.aui-message-user {
-  margin: 1rem 0;
-  padding: 0 1rem;
-  width: 100%;
+/* User message styling - ensure high contrast */
+.aui-user-message-content {
+  color: var(--secondary-foreground) !important;
 }
 
-.aui-message-user-content {
-  background-color: oklch(0.205 0 0);
-  color: oklch(0.985 0 0) !important;
-  padding: 0.75rem 1rem;
-  border-radius: var(--radius);
-  max-width: 70%;
-  min-width: 100px;
-  word-wrap: break-word;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-  line-height: 1.5;
-  font-size: 0.9375rem;
+.aui-user-message-content > *,
+.aui-user-message-content span,
+.aui-user-message-content div,
+.aui-user-message-content p {
+  color: var(--secondary-foreground) !important;
 }
 
-.aui-message-user-content > *,
-.aui-message-user-content span,
-.aui-message-user-content div {
-  color: oklch(0.985 0 0) !important;
+/* Assistant message styling - ensure high contrast */
+.aui-assistant-message-content {
+  color: var(--card-foreground) !important;
 }
 
-/* Assistant message styling */
-.aui-message-assistant {
-  margin: 1rem 0;
-  padding: 0 1rem;
-  width: 100%;
+.aui-assistant-message-content > *,
+.aui-assistant-message-content span,
+.aui-assistant-message-content div,
+.aui-assistant-message-content p,
+.aui-assistant-message-content h1,
+.aui-assistant-message-content h2,
+.aui-assistant-message-content h3,
+.aui-assistant-message-content h4,
+.aui-assistant-message-content h5,
+.aui-assistant-message-content h6,
+.aui-assistant-message-content li,
+.aui-assistant-message-content a,
+.aui-assistant-message-content blockquote {
+  color: var(--card-foreground) !important;
 }
 
-.aui-message-assistant-content {
-  background-color: oklch(0.97 0 0);
-  color: oklch(0.145 0 0) !important;
-  padding: 0.75rem 1rem;
-  border-radius: var(--radius);
-  max-width: 70%;
-  word-wrap: break-word;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-  line-height: 1.5;
-  font-size: 0.9375rem;
+/* Markdown text in messages */
+.aui-assistant-message-content .aui-md,
+.aui-assistant-message-content .aui-md * {
+  color: var(--card-foreground) !important;
 }
 
-.aui-message-assistant-content > *,
-.aui-message-assistant-content span,
-.aui-message-assistant-content div,
-.aui-message-assistant-content p {
-  color: oklch(0.145 0 0) !important;
-}
-
-/* Dark mode adjustments */
-.dark .aui-message-user-content {
-  background-color: oklch(0.2 0 0);
-  color: oklch(0.98 0 0) !important;
-}
-
-.dark .aui-message-user-content > *,
-.dark .aui-message-user-content span,
-.dark .aui-message-user-content div {
-  color: oklch(0.98 0 0) !important;
-}
-
-.dark .aui-message-assistant-content {
-  background-color: oklch(0.15 0 0);
-  color: oklch(0.98 0 0) !important;
-}
-
-.dark .aui-message-assistant-content > *,
-.dark .aui-message-assistant-content span,
-.dark .aui-message-assistant-content div,
-.dark .aui-message-assistant-content p {
-  color: oklch(0.98 0 0) !important;
+.aui-user-message-content .aui-md,
+.aui-user-message-content .aui-md * {
+  color: var(--secondary-foreground) !important;
 }
 
 @theme inline {
