@@ -39,62 +39,62 @@
   --foreground: oklch(0.15 0.015 260);
 }
 
-/* Clean dark mode - Grok-inspired theme */
+/* Cursor-inspired dark theme */
 .dark {
-  /* Pure black background */
-  --background: oklch(0.0 0 0);
-  /* Clean white text */
-  --foreground: oklch(0.95 0 0);
+  /* Dark charcoal background - Cursor's signature look */
+  --background: oklch(0.13 0.005 260);
+  /* Soft off-white text */
+  --foreground: oklch(0.88 0.01 260);
   
-  /* Card - transparent for assistant messages */
-  --card: transparent;
-  --card-foreground: oklch(0.92 0 0);
+  /* Card - slightly elevated surface */
+  --card: oklch(0.16 0.005 260);
+  --card-foreground: oklch(0.88 0.01 260);
   
   /* Popover */
-  --popover: oklch(0.12 0 0);
-  --popover-foreground: oklch(0.95 0 0);
+  --popover: oklch(0.18 0.005 260);
+  --popover-foreground: oklch(0.88 0.01 260);
   
-  /* Primary - vibrant blue for buttons */
-  --primary: oklch(0.65 0.2 250);
+  /* Primary - Cursor blue for send button and accents */
+  --primary: oklch(0.62 0.19 250);
   --primary-foreground: oklch(1 0 0);
   
-  /* User message bubble - bright electric blue */
-  --secondary: oklch(0.58 0.22 250);
-  --secondary-foreground: oklch(1 0 0);
+  /* User message bubble - subtle dark gray */
+  --secondary: oklch(0.24 0.01 260);
+  --secondary-foreground: oklch(0.92 0.01 260);
   
   /* Muted elements */
-  --muted: oklch(0.18 0 0);
-  --muted-foreground: oklch(0.55 0 0);
+  --muted: oklch(0.20 0.005 260);
+  --muted-foreground: oklch(0.55 0.01 260);
   
-  /* Accent */
-  --accent: oklch(0.15 0 0);
-  --accent-foreground: oklch(0.90 0 0);
+  /* Accent - hover states */
+  --accent: oklch(0.22 0.008 260);
+  --accent-foreground: oklch(0.88 0.01 260);
   
   /* Error states */
-  --destructive: oklch(0.60 0.22 25);
+  --destructive: oklch(0.55 0.2 25);
   --destructive-foreground: oklch(1 0 0);
   
-  /* Subtle borders */
-  --border: oklch(0.22 0 0);
-  --input: oklch(0.12 0 0);
-  --ring: oklch(0.58 0.22 250);
+  /* Subtle borders - Cursor style */
+  --border: oklch(0.26 0.008 260);
+  --input: oklch(0.16 0.005 260);
+  --ring: oklch(0.62 0.19 250);
   
   /* Chart colors */
-  --chart-1: oklch(0.65 0.2 250);
-  --chart-2: oklch(0.70 0.14 180);
-  --chart-3: oklch(0.72 0.15 55);
-  --chart-4: oklch(0.68 0.18 330);
-  --chart-5: oklch(0.65 0.18 140);
+  --chart-1: oklch(0.62 0.19 250);
+  --chart-2: oklch(0.68 0.14 180);
+  --chart-3: oklch(0.70 0.15 55);
+  --chart-4: oklch(0.65 0.18 330);
+  --chart-5: oklch(0.62 0.18 140);
   
   /* Sidebar */
-  --sidebar: oklch(0.0 0 0);
-  --sidebar-foreground: oklch(0.95 0 0);
-  --sidebar-primary: oklch(0.58 0.22 250);
+  --sidebar: oklch(0.11 0.005 260);
+  --sidebar-foreground: oklch(0.88 0.01 260);
+  --sidebar-primary: oklch(0.62 0.19 250);
   --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.15 0 0);
-  --sidebar-accent-foreground: oklch(0.90 0 0);
-  --sidebar-border: oklch(0.22 0 0);
-  --sidebar-ring: oklch(0.58 0.22 250);
+  --sidebar-accent: oklch(0.18 0.005 260);
+  --sidebar-accent-foreground: oklch(0.88 0.01 260);
+  --sidebar-border: oklch(0.24 0.008 260);
+  --sidebar-ring: oklch(0.62 0.19 250);
 }
 
 * {
@@ -107,9 +107,9 @@ body {
   font-feature-settings: "rlig" 1, "calt" 1;
 }
 
-/* Pure black background */
+/* Cursor charcoal background */
 .dark body {
-  background: oklch(0.0 0 0);
+  background: oklch(0.13 0.005 260);
 }
 
 /* User message styling - white text on blue */
@@ -144,15 +144,15 @@ body {
   color: var(--foreground) !important;
 }
 
-/* Links with blue accent */
+/* Links with Cursor blue accent */
 .aui-assistant-message-content a {
-  color: oklch(0.65 0.2 250) !important;
+  color: oklch(0.62 0.19 250) !important;
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
 .aui-assistant-message-content a:hover {
-  color: oklch(0.72 0.18 250) !important;
+  color: oklch(0.70 0.17 250) !important;
 }
 
 /* Markdown text in messages */
@@ -166,11 +166,11 @@ body {
   color: var(--secondary-foreground) !important;
 }
 
-/* Code blocks */
+/* Code blocks - Cursor style */
 .dark .aui-assistant-message-content pre,
 .dark .aui-assistant-message-content code {
-  background: oklch(0.12 0 0) !important;
-  border: 1px solid oklch(0.22 0 0);
+  background: oklch(0.10 0.005 260) !important;
+  border: 1px solid oklch(0.26 0.008 260);
   border-radius: 0.5rem;
 }
 
@@ -187,10 +187,10 @@ body {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Suggestion button hover */
+/* Suggestion button hover - Cursor style */
 .dark .aui-thread-welcome-suggestion:hover {
-  background: oklch(0.12 0 0) !important;
-  border-color: oklch(0.30 0 0) !important;
+  background: oklch(0.18 0.005 260) !important;
+  border-color: oklch(0.32 0.01 260) !important;
 }
 
 @theme inline {
