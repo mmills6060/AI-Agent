@@ -101,13 +101,18 @@ const LangGraphAdapter: ChatModelAdapter = {
             try {
               const data: SSEEvent = JSON.parse(dataStr)
               
+              // Debug: Log all SSE events
+              console.log('[SSE Event]', data.type, data.agent, data)
+              
               if (data.type === 'agent_update' && data.agent && data.data) {
+                console.log('[Agent Update]', data.agent, data.data)
                 setActiveAgent(data.agent)
                 
                 // Add latest activity from history
                 const history = data.data.agent_history
                 if (history && history.length > 0) {
                   const latest = history[history.length - 1]
+                  console.log('[Adding Activity]', latest)
                   addAgentActivity({
                     agent: latest.agent,
                     action: latest.action,

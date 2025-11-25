@@ -8,6 +8,12 @@ import {
   PencilIcon,
   RefreshCwIcon,
   Square,
+  BrainCircuit,
+  Search,
+  CheckCircle2,
+  FileText,
+  Loader2,
+  Sparkles,
 } from "lucide-react";
 
 import {
@@ -31,8 +37,42 @@ import {
   ComposerAttachments,
   UserMessageAttachments,
 } from "@/components/assistant-ui/attachment";
+import { useAgentStore } from "@/lib/agent-store";
 
 import { cn } from "@/lib/utils";
+
+const agentConfig: Record<string, { icon: typeof BrainCircuit; color: string; bgColor: string; label: string }> = {
+  orchestrator: { 
+    icon: BrainCircuit, 
+    color: "text-purple-400",
+    bgColor: "bg-purple-500/10",
+    label: "Planning" 
+  },
+  researcher: { 
+    icon: Search, 
+    color: "text-blue-400",
+    bgColor: "bg-blue-500/10",
+    label: "Researching" 
+  },
+  validator: { 
+    icon: CheckCircle2, 
+    color: "text-green-400",
+    bgColor: "bg-green-500/10",
+    label: "Validating" 
+  },
+  synthesizer: { 
+    icon: FileText, 
+    color: "text-amber-400",
+    bgColor: "bg-amber-500/10",
+    label: "Synthesizing" 
+  },
+  simple_response: { 
+    icon: Sparkles, 
+    color: "text-cyan-400",
+    bgColor: "bg-cyan-500/10",
+    label: "Responding" 
+  },
+};
 
 export const Thread: FC = () => {
   return (
@@ -228,13 +268,119 @@ const MessageError: FC = () => {
   );
 };
 
+const AgentActivityInline: FC<{ isRunning?: boolean }> = ({ isRunning = false }) => {
+  const { agentHistory, isProcessing, activeAgent } = useAgentStore()
+
+  // Show when running OR when we have history from the current/recent response
+  if (agentHistory.length === 0 && !isProcessing) return null
+
+  const isComplete = !isProcessing && agentHistory.length > 0
+
+  return (
+    <m.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="mb-4 mx-2"
+    >
+      {/* Activity steps - horizontal timeline */}
+      <div className="flex items-center gap-1 flex-wrap">
+        {agentHistory.map((activity, index) => {
+          const config = agentConfig[activity.agent] || agentConfig.orchestrator
+          const Icon = config.icon
+          const isActive = activeAgent === activity.agent && isProcessing && index === agentHistory.length - 1
+          const isLastStep = index === agentHistory.length - 1
+
+          return (
+            <m.div
+              key={`${activity.agent}-${activity.timestamp}`}
+              initial={{ opacity: 0, scale: 0.8, x: -10 }}
+              animate={{ opacity: 1, scale: 1, x: 0 }}
+              transition={{ delay: index * 0.1, type: "spring", stiffness: 400, damping: 25 }}
+              className="flex items-center"
+            >
+              {/* Agent step */}
+              <div
+                className={cn(
+                  "group relative flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-default",
+                  isActive 
+                    ? cn(config.bgColor, config.color, "ring-1 ring-current/30")
+                    : isComplete
+                      ? cn(config.bgColor, config.color, "opacity-80")
+                      : "bg-muted/40 text-muted-foreground hover:bg-muted/60"
+                )}
+              >
+                {isActive ? (
+                  <Loader2 className={cn("h-3.5 w-3.5 animate-spin", config.color)} />
+                ) : isComplete ? (
+                  <Icon className={cn("h-3.5 w-3.5", config.color)} />
+                ) : (
+                  <Icon className={cn("h-3.5 w-3.5", isRunning ? config.color : "text-muted-foreground")} />
+                )}
+                <span className={cn((isActive || isComplete) && config.color)}>{config.label}</span>
+                
+                {/* Tooltip with action details */}
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-popover border border-border rounded text-[10px] text-popover-foreground whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg z-10">
+                  {activity.action}
+                </div>
+              </div>
+
+              {/* Connector line */}
+              {!isLastStep && (
+                <m.div 
+                  initial={{ scaleX: 0 }}
+                  animate={{ scaleX: 1 }}
+                  transition={{ delay: index * 0.1 + 0.05 }}
+                  className={cn(
+                    "w-4 h-px origin-left",
+                    isComplete ? "bg-border/80" : "bg-border"
+                  )}
+                />
+              )}
+            </m.div>
+          )
+        })}
+
+        {/* Completion indicator */}
+        {isComplete && (
+          <m.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.2 }}
+            className="flex items-center gap-1.5 px-2 py-1 text-xs text-emerald-500"
+          >
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            <span className="font-medium">Complete</span>
+          </m.div>
+        )}
+
+        {/* Thinking indicator when no history yet */}
+        {isProcessing && agentHistory.length === 0 && (
+          <m.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-muted/40 text-muted-foreground"
+          >
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <span>Starting...</span>
+          </m.div>
+        )}
+      </div>
+    </m.div>
+  )
+}
+
 const AssistantMessage: FC = () => {
+  const { isProcessing } = useAgentStore()
+  
   return (
     <MessagePrimitive.Root asChild>
       <div
         className="aui-assistant-message-root relative mx-auto w-full max-w-[var(--thread-max-width)] animate-in py-4 duration-150 ease-out fade-in slide-in-from-bottom-1 last:mb-24"
         data-role="assistant"
       >
+        {/* Agent activity timeline - always visible when there's data */}
+        <AgentActivityInline isRunning={isProcessing} />
+        
         <div className="aui-assistant-message-content mx-2 leading-7 break-words text-foreground">
           <MessagePrimitive.Parts
             components={{
