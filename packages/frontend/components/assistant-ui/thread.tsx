@@ -4,6 +4,7 @@ import {
   CheckIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  ChevronDownIcon,
   CopyIcon,
   PencilIcon,
   RefreshCwIcon,
@@ -25,7 +26,7 @@ import {
   ThreadPrimitive,
 } from "@assistant-ui/react";
 
-import type { FC } from "react";
+import { useState, type FC } from "react";
 import { LazyMotion, MotionConfig, domAnimation } from "motion/react";
 import * as m from "motion/react-m";
 import { Button } from "@/components/ui/button";
@@ -268,13 +269,23 @@ const MessageError: FC = () => {
   );
 };
 
-const AgentActivityInline: FC<{ isRunning?: boolean }> = ({ isRunning = false }) => {
+const formatAgentOutput = (output: string | Record<string, unknown>): string => {
+  if (typeof output === "string") return output
+  return JSON.stringify(output, null, 2)
+}
+
+const AgentActivityInline: FC = () => {
   const { agentHistory, isProcessing, activeAgent } = useAgentStore()
+  const [expandedAgent, setExpandedAgent] = useState<string | null>(null)
 
   // Show when running OR when we have history from the current/recent response
   if (agentHistory.length === 0 && !isProcessing) return null
 
   const isComplete = !isProcessing && agentHistory.length > 0
+
+  const toggleExpanded = (key: string) => {
+    setExpandedAgent(prev => prev === key ? null : key)
+  }
 
   return (
     <m.div
@@ -282,60 +293,124 @@ const AgentActivityInline: FC<{ isRunning?: boolean }> = ({ isRunning = false })
       animate={{ opacity: 1, y: 0 }}
       className="mb-4 mx-2"
     >
-      {/* Activity steps - horizontal timeline */}
-      <div className="flex items-center gap-1 flex-wrap">
+      {/* Vertical timeline container */}
+      <div className="flex flex-col gap-0">
         {agentHistory.map((activity, index) => {
           const config = agentConfig[activity.agent] || agentConfig.orchestrator
           const Icon = config.icon
           const isActive = activeAgent === activity.agent && isProcessing && index === agentHistory.length - 1
           const isLastStep = index === agentHistory.length - 1
+          const activityKey = `${activity.agent}-${activity.timestamp}`
+          const isExpanded = expandedAgent === activityKey
+          const hasOutput = activity.output && (
+            typeof activity.output === "string" 
+              ? activity.output.trim().length > 0 
+              : Object.keys(activity.output).length > 0
+          )
 
           return (
             <m.div
-              key={`${activity.agent}-${activity.timestamp}`}
-              initial={{ opacity: 0, scale: 0.8, x: -10 }}
-              animate={{ opacity: 1, scale: 1, x: 0 }}
+              key={activityKey}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
               transition={{ delay: index * 0.1, type: "spring", stiffness: 400, damping: 25 }}
-              className="flex items-center"
+              className="flex flex-col"
             >
-              {/* Agent step */}
-              <div
-                className={cn(
-                  "group relative flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-default",
-                  isActive 
-                    ? cn(config.bgColor, config.color, "ring-1 ring-current/30")
-                    : isComplete
-                      ? cn(config.bgColor, config.color, "opacity-80")
-                      : "bg-muted/40 text-muted-foreground hover:bg-muted/60"
-                )}
-              >
-                {isActive ? (
-                  <Loader2 className={cn("h-3.5 w-3.5 animate-spin", config.color)} />
-                ) : isComplete ? (
-                  <Icon className={cn("h-3.5 w-3.5", config.color)} />
-                ) : (
-                  <Icon className={cn("h-3.5 w-3.5", isRunning ? config.color : "text-muted-foreground")} />
-                )}
-                <span className={cn((isActive || isComplete) && config.color)}>{config.label}</span>
-                
-                {/* Tooltip with action details */}
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-popover border border-border rounded text-[10px] text-popover-foreground whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg z-10">
-                  {activity.action}
+              {/* Agent step row */}
+              <div className="flex items-stretch">
+                {/* Vertical line and dot indicator */}
+                <div className="flex flex-col items-center mr-3 w-5">
+                  {/* Top connector line */}
+                  {index > 0 && (
+                    <div className={cn(
+                      "w-0.5 h-2 -mt-0",
+                      isComplete ? config.bgColor : "bg-border"
+                    )} />
+                  )}
+                  {/* Dot indicator */}
+                  <div className={cn(
+                    "flex items-center justify-center w-5 h-5 rounded-full shrink-0",
+                    isActive 
+                      ? cn(config.bgColor, "ring-2 ring-offset-1 ring-offset-background", config.color.replace("text-", "ring-"))
+                      : config.bgColor
+                  )}>
+                    {isActive ? (
+                      <Loader2 className={cn("h-3 w-3 animate-spin", config.color)} />
+                    ) : (
+                      <Icon className={cn("h-3 w-3", config.color)} />
+                    )}
+                  </div>
+                  {/* Bottom connector line */}
+                  {!isLastStep && (
+                    <div className={cn(
+                      "w-0.5 flex-1 min-h-2",
+                      isComplete ? config.bgColor : "bg-border"
+                    )} />
+                  )}
+                </div>
+
+                {/* Agent step content */}
+                <div className="flex-1 pb-3">
+                  <button
+                    onClick={() => hasOutput && toggleExpanded(activityKey)}
+                    disabled={!hasOutput}
+                    className={cn(
+                      "w-full text-left flex items-center justify-between gap-2 px-3 py-2 rounded-lg transition-all",
+                      hasOutput && "cursor-pointer hover:bg-accent/50",
+                      !hasOutput && "cursor-default",
+                      isExpanded && "bg-accent/30",
+                      isActive && cn(config.bgColor, "ring-1 ring-inset", config.color.replace("text-", "ring-").replace("-400", "-500/30"))
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={cn(
+                        "text-sm font-medium",
+                        isActive || isComplete ? config.color : "text-muted-foreground"
+                      )}>
+                        {config.label}
+                      </span>
+                      <span className="text-xs text-muted-foreground/70 truncate max-w-[200px]">
+                        {activity.action}
+                      </span>
+                    </div>
+                    {hasOutput && (
+                      <ChevronDownIcon 
+                        className={cn(
+                          "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                          isExpanded && "rotate-180"
+                        )} 
+                      />
+                    )}
+                  </button>
+
+                  {/* Expanded output content */}
+                  {isExpanded && hasOutput && (
+                    <m.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="mt-2 ml-1"
+                    >
+                      <div className={cn(
+                        "rounded-lg border p-3 text-sm",
+                        config.bgColor,
+                        "border-current/10"
+                      )}>
+                        <div className="flex items-center gap-2 mb-2 pb-2 border-b border-current/10">
+                          <Icon className={cn("h-4 w-4", config.color)} />
+                          <span className={cn("text-xs font-semibold uppercase tracking-wider", config.color)}>
+                            {config.label} Output
+                          </span>
+                        </div>
+                        <pre className="text-xs text-foreground/80 whitespace-pre-wrap font-mono overflow-x-auto max-h-[300px] overflow-y-auto">
+                          {formatAgentOutput(activity.output)}
+                        </pre>
+                      </div>
+                    </m.div>
+                  )}
                 </div>
               </div>
-
-              {/* Connector line */}
-              {!isLastStep && (
-                <m.div 
-                  initial={{ scaleX: 0 }}
-                  animate={{ scaleX: 1 }}
-                  transition={{ delay: index * 0.1 + 0.05 }}
-                  className={cn(
-                    "w-4 h-px origin-left",
-                    isComplete ? "bg-border/80" : "bg-border"
-                  )}
-                />
-              )}
             </m.div>
           )
         })}
@@ -346,10 +421,12 @@ const AgentActivityInline: FC<{ isRunning?: boolean }> = ({ isRunning = false })
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.2 }}
-            className="flex items-center gap-1.5 px-2 py-1 text-xs text-emerald-500"
+            className="flex items-center gap-2 ml-8 mt-1"
           >
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            <span className="font-medium">Complete</span>
+            <div className="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/10">
+              <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+            </div>
+            <span className="text-xs font-medium text-emerald-500">Complete</span>
           </m.div>
         )}
 
@@ -358,10 +435,12 @@ const AgentActivityInline: FC<{ isRunning?: boolean }> = ({ isRunning = false })
           <m.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-muted/40 text-muted-foreground"
+            className="flex items-center gap-2"
           >
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            <span>Starting...</span>
+            <div className="flex items-center justify-center w-5 h-5 rounded-full bg-muted/40">
+              <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+            </div>
+            <span className="text-xs font-medium text-muted-foreground">Starting...</span>
           </m.div>
         )}
       </div>
@@ -370,8 +449,6 @@ const AgentActivityInline: FC<{ isRunning?: boolean }> = ({ isRunning = false })
 }
 
 const AssistantMessage: FC = () => {
-  const { isProcessing } = useAgentStore()
-  
   return (
     <MessagePrimitive.Root asChild>
       <div
@@ -379,7 +456,7 @@ const AssistantMessage: FC = () => {
         data-role="assistant"
       >
         {/* Agent activity timeline - always visible when there's data */}
-        <AgentActivityInline isRunning={isProcessing} />
+        <AgentActivityInline />
         
         <div className="aui-assistant-message-content mx-2 leading-7 break-words text-foreground">
           <MessagePrimitive.Parts
