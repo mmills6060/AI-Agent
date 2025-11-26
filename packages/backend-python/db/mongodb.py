@@ -51,7 +51,7 @@ class MongoDBClient:
     
     # Sessions
     def create_session(self) -> str:
-        if not self.connected or not self.db:
+        if not self.connected or self.db is None:
             return str(uuid.uuid4())
         result = self.db.sessions.insert_one({
             "created_at": datetime.utcnow(),
@@ -60,7 +60,7 @@ class MongoDBClient:
         return str(result.inserted_id)
     
     def get_session(self, session_id: str) -> Optional[dict]:
-        if not self.connected or not self.db:
+        if not self.connected or self.db is None:
             return None
         try:
             return self.db.sessions.find_one({"_id": ObjectId(session_id)})
@@ -68,7 +68,7 @@ class MongoDBClient:
             return None
     
     def add_message_to_session(self, session_id: str, role: str, content: str):
-        if not self.connected or not self.db:
+        if not self.connected or self.db is None:
             return
         try:
             self.db.sessions.update_one(
@@ -84,7 +84,7 @@ class MongoDBClient:
     
     # Queries
     def log_query(self, user_query: str, session_id: Optional[str] = None) -> str:
-        if not self.connected or not self.db:
+        if not self.connected or self.db is None:
             return str(uuid.uuid4())
         result = self.db.queries.insert_one({
             "user_query": user_query,
@@ -94,7 +94,7 @@ class MongoDBClient:
         return str(result.inserted_id)
     
     def get_queries(self, limit: int = 100) -> list:
-        if not self.connected or not self.db:
+        if not self.connected or self.db is None:
             return []
         cursor = self.db.queries.find().sort("timestamp", -1).limit(limit)
         return [{**doc, "_id": str(doc["_id"])} for doc in cursor]
@@ -107,7 +107,7 @@ class MongoDBClient:
         output: str,
         metadata: Optional[dict] = None
     ) -> str:
-        if not self.connected or not self.db:
+        if not self.connected or self.db is None:
             return str(uuid.uuid4())
         result = self.db.agent_outputs.insert_one({
             "query_id": query_id,
@@ -119,13 +119,13 @@ class MongoDBClient:
         return str(result.inserted_id)
     
     def get_agent_outputs_for_query(self, query_id: str) -> list:
-        if not self.connected or not self.db:
+        if not self.connected or self.db is None:
             return []
         cursor = self.db.agent_outputs.find({"query_id": query_id}).sort("timestamp", 1)
         return [{**doc, "_id": str(doc["_id"])} for doc in cursor]
     
     def get_all_agent_outputs(self, limit: int = 100) -> list:
-        if not self.connected or not self.db:
+        if not self.connected or self.db is None:
             return []
         cursor = self.db.agent_outputs.find().sort("timestamp", -1).limit(limit)
         return [{**doc, "_id": str(doc["_id"])} for doc in cursor]

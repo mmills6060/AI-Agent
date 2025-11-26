@@ -11,8 +11,8 @@ class Settings(BaseSettings):
     tavily_api_key: str = ""
     
     # MongoDB
-    mongodb_uri: str = "mongodb://localhost:27017"
-    mongodb_database: str = "multi_agent_db"
+    mongodb_uri: str = "mongodb+srv://mmills6060:Dirtballer!6060@cluster0.h4j24vd.mongodb.net/"
+    mongodb_database: str = "agent"
     
     # Server
     host: str = "0.0.0.0"
