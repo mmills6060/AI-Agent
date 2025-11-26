@@ -1,0 +1,42 @@
+# AWS Configuration
+aws_region = "us-east-1"
+project_name = "ai-agent"
+environment = "prod"
+
+# VPC Configuration
+vpc_cidr = "10.0.0.0/16"
+availability_zones = ["us-east-1a", "us-east-1b"]
+
+# Container Resource Configurations
+frontend_cpu    = 256
+frontend_memory = 512
+
+backend_node_cpu    = 256
+backend_node_memory = 512
+
+backend_python_cpu    = 512
+backend_python_memory = 1024
+
+# Scaling Configuration
+frontend_desired_count       = 2
+backend_node_desired_count   = 2
+backend_python_desired_count = 2
+
+# Secrets (provide these via environment variables or GitHub secrets)
+# Do NOT commit actual values to version control!
+# 
+# Option 1: Use environment variables
+#   export TF_VAR_openai_api_key="your-key"
+#   export TF_VAR_tavily_api_key="your-key"
+#   etc.
+#
+# Option 2: Use a secrets.tfvars file (add to .gitignore)
+#   terraform apply -var-file="secrets.tfvars"
+
+# openai_api_key       = ""
+# tavily_api_key       = ""
+# mongodb_uri          = ""
+# mongodb_database     = "multi_agent_db"
+# supabase_url         = ""
+# supabase_service_key = ""
+
