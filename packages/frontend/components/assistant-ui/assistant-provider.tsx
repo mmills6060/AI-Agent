@@ -24,10 +24,11 @@ interface AgentUpdateData {
 }
 
 interface SSEEvent {
-  type: "agent_update" | "final_response"
+  type: "agent_update" | "final_response" | "delta" | "error"
   agent?: string
   data?: AgentUpdateData
   content?: string
+  error?: string
 }
 
 const LangGraphAdapter: ChatModelAdapter = {
