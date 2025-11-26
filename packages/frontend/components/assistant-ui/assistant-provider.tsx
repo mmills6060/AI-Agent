@@ -36,7 +36,7 @@ const LangGraphAdapter: ChatModelAdapter = {
       setActiveAgent, 
       addAgentActivity, 
       clearHistory, 
-      setSessionId,
+      setSessionId: _setSessionId,
       setIsProcessing 
     } = useAgentStore.getState()
     
