@@ -6,6 +6,7 @@ from agents.orchestrator import OrchestratorAgent
 from agents.researcher import ResearcherAgent
 from agents.validator import ValidatorAgent
 from agents.synthesizer import SynthesizerAgent
+from db.mongodb import get_db_client
 
 
 # Initialize agents
@@ -136,6 +137,9 @@ async def run_workflow_stream(
         "agent_history": []
     }
     
+    # Track final state to save agent_history
+    final_state = None
+    
     # Stream through workflow nodes
     async for event in workflow.astream(initial_state):
         # Extract the node name and state update
@@ -153,10 +157,17 @@ async def run_workflow_stream(
                 }
             }
             
-            # If this is the final response, stream it
+            # If this is the final response, stream it and save agent_history
             if state_update.get("final_response"):
+                final_state = state_update
                 yield {
                     "type": "final_response",
                     "content": state_update["final_response"]
                 }
+    
+    # Save agent_history to session after workflow completes
+    if final_state and final_state.get("agent_history"):
+        db = get_db_client()
+        agent_history = final_state.get("agent_history", [])
+        db.save_agent_history_to_session(session_id, query_id, agent_history)
 

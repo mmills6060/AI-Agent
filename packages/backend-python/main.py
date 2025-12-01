@@ -95,6 +95,16 @@ async def get_session(session_id: str):
     return session
 
 
+@app.delete("/api/sessions/{session_id}")
+async def delete_session(session_id: str):
+    """Delete a session by ID."""
+    db = get_db_client()
+    deleted = db.delete_session(session_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"message": "Session deleted successfully", "session_id": session_id}
+
+
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
     """

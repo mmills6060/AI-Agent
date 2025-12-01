@@ -1,13 +1,22 @@
 "use client"
 
 import { useEffect, useState, type FC } from "react"
-import { PlusIcon, MessageSquare, Loader2 } from "lucide-react"
+import { PlusIcon, MessageSquare, Loader2, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { useAgentStore } from "@/lib/agent-store"
 import { useLoadSession } from "@/lib/use-load-session"
 import { useThreadRuntime } from "@assistant-ui/react"
+import { deleteSession } from "./handlers/delete-session"
 
 interface Session {
   _id: string
@@ -32,6 +41,8 @@ export const ConversationList: FC<ConversationListProps> = ({
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [loadingSessionId, setLoadingSessionId] = useState<string | null>(null)
+  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null)
+  const [sessionToDelete, setSessionToDelete] = useState<Session | null>(null)
   const { loadSession } = useLoadSession()
   const thread = useThreadRuntime()
 
@@ -129,6 +140,51 @@ export const ConversationList: FC<ConversationListProps> = ({
     }
   }
 
+  const handleDeleteClick = (e: React.MouseEvent, session: Session) => {
+    e.stopPropagation()
+    setSessionToDelete(session)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!sessionToDelete) return
+
+    try {
+      setDeletingSessionId(sessionToDelete._id)
+      await deleteSession(sessionToDelete._id)
+      
+      // Remove from list
+      setSessions(prev => prev.filter(s => s._id !== sessionToDelete._id))
+      
+      // If deleted session was selected, clear selection
+      if (selectedSessionId === sessionToDelete._id) {
+        if (thread?.reset) {
+          try {
+            thread.reset([])
+          } catch (resetError) {
+            console.warn("Thread reset failed:", resetError)
+          }
+        }
+        useAgentStore.getState().setSessionId(null)
+        useAgentStore.getState().clearHistory()
+        if (onSelectSession) {
+          onSelectSession("")
+        }
+      }
+      
+      setSessionToDelete(null)
+    } catch (error) {
+      console.error("Failed to delete session:", error)
+      setError("Failed to delete conversation")
+      setSessionToDelete(null)
+    } finally {
+      setDeletingSessionId(null)
+    }
+  }
+
+  const handleCancelDelete = () => {
+    setSessionToDelete(null)
+  }
+
   return (
     <div className="flex flex-col h-full w-[250px] bg-background border-r-2 border-border relative z-10">
       <div className="p-3 border-b border-border shrink-0">
@@ -165,39 +221,98 @@ export const ConversationList: FC<ConversationListProps> = ({
           <div className="flex flex-col gap-1 p-2">
             {sessions.map((session) => {
               const isSelected = selectedSessionId === session._id
+              const isDeleting = deletingSessionId === session._id
               return (
-                <button
+                <div
                   key={session._id}
-                  onClick={() => handleSelectSession(session._id)}
-                  disabled={loadingSessionId === session._id}
                   className={cn(
-                    "flex flex-col gap-1 px-3 py-2 rounded-lg text-left transition-all",
-                    "hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-                    isSelected && "bg-muted",
-                    loadingSessionId === session._id && "opacity-50 cursor-wait"
+                    "group relative flex items-center gap-2 rounded-lg transition-all",
+                    "hover:bg-muted",
+                    isSelected && "bg-muted"
                   )}
                 >
-                  <div className="flex items-start gap-2">
-                    {loadingSessionId === session._id ? (
-                      <Loader2 className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0 animate-spin" />
-                    ) : (
-                      <MessageSquare className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                  <button
+                    onClick={() => handleSelectSession(session._id)}
+                    disabled={loadingSessionId === session._id || isDeleting}
+                    className={cn(
+                      "flex flex-col gap-1 px-3 py-2 rounded-lg text-left transition-all flex-1",
+                      "hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                      isSelected && "bg-muted",
+                      (loadingSessionId === session._id || isDeleting) && "opacity-50 cursor-wait"
                     )}
-                    <span className="text-sm font-medium line-clamp-2 flex-1">
-                      {getConversationTitle(session)}
-                    </span>
-                  </div>
-                  {session.created_at && (
-                    <span className="text-xs text-muted-foreground ml-6">
-                      {formatDate(session.created_at)}
-                    </span>
-                  )}
-                </button>
+                  >
+                    <div className="flex items-start gap-2">
+                      {loadingSessionId === session._id ? (
+                        <Loader2 className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0 animate-spin" />
+                      ) : (
+                        <MessageSquare className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                      )}
+                      <span className="text-sm font-medium line-clamp-2 flex-1">
+                        {getConversationTitle(session)}
+                      </span>
+                    </div>
+                    {session.created_at && (
+                      <span className="text-xs text-muted-foreground ml-6">
+                        {formatDate(session.created_at)}
+                      </span>
+                    )}
+                  </button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={(e) => handleDeleteClick(e, session)}
+                    disabled={isDeleting}
+                    className={cn(
+                      "opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mr-2",
+                      "hover:bg-muted-foreground/10 hover:text-muted-foreground",
+                      isDeleting && "opacity-100"
+                    )}
+                    aria-label="Delete conversation"
+                  >
+                    {isDeleting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
               )
             })}
           </div>
         )}
       </div>
+
+      <Dialog open={!!sessionToDelete} onOpenChange={(open) => !open && handleCancelDelete()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Conversation</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this conversation? This action cannot be undone.
+              {sessionToDelete && (
+                <span className="block mt-2 font-medium text-foreground">
+                  "{getConversationTitle(sessionToDelete)}"
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={handleCancelDelete}
+              disabled={!!deletingSessionId}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmDelete}
+              disabled={!!deletingSessionId}
+            >
+              {deletingSessionId ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

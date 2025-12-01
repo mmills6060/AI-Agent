@@ -9,7 +9,7 @@ import {
   PencilIcon,
   RefreshCwIcon,
   Square,
-  BrainCircuit,
+  Brain,
   Search,
   CheckCircle2,
   FileText,
@@ -42,9 +42,9 @@ import { useAgentStore } from "@/lib/agent-store";
 
 import { cn } from "@/lib/utils";
 
-const agentConfig: Record<string, { icon: typeof BrainCircuit; color: string; bgColor: string; label: string }> = {
+const agentConfig: Record<string, { icon: typeof Brain; color: string; bgColor: string; label: string }> = {
   orchestrator: { 
-    icon: BrainCircuit, 
+    icon: Brain, 
     color: "text-muted-foreground",
     bgColor: "bg-muted-foreground/10",
     label: "Planning" 
@@ -415,19 +415,6 @@ const AgentActivityInline: FC = () => {
           )
         })}
 
-        {/* Thinking indicator when no history yet */}
-        {isProcessing && agentHistory.length === 0 && (
-          <m.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="flex items-center gap-2"
-          >
-            <div className="flex items-center justify-center w-5 h-5 rounded-full bg-muted/40">
-              <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-            </div>
-            <span className="text-xs font-medium text-muted-foreground">Starting...</span>
-          </m.div>
-        )}
       </div>
     </m.div>
   )

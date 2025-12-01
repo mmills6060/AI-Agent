@@ -15,6 +15,7 @@ interface AgentState {
   setActiveAgent: (agent: string | null) => void
   addAgentActivity: (activity: Omit<AgentActivity, "timestamp">) => void
   clearHistory: () => void
+  setAgentHistory: (history: AgentActivity[]) => void
   setSessionId: (id: string | null) => void
   setIsProcessing: (processing: boolean) => void
 }
@@ -33,6 +34,7 @@ export const useAgentStore = create<AgentState>((set) => ({
       ],
     })),
   clearHistory: () => set({ agentHistory: [], activeAgent: null }),
+  setAgentHistory: (history) => set({ agentHistory: history }),
   setSessionId: (id) => set({ sessionId: id }),
   setIsProcessing: (processing) => set({ isProcessing: processing }),
 }))

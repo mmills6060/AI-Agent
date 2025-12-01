@@ -82,12 +82,35 @@ class MongoDBClient:
         except Exception:
             pass
     
+    def save_agent_history_to_session(self, session_id: str, query_id: str, agent_history: list):
+        """Save agent history for a specific query to the session."""
+        if not self.connected or self.db is None:
+            return
+        try:
+            # Store agent_history keyed by query_id in the session
+            self.db.sessions.update_one(
+                {"_id": ObjectId(session_id)},
+                {"$set": {f"agent_history.{query_id}": agent_history}}
+            )
+        except Exception:
+            pass
+    
     def get_all_sessions(self, limit: int = 100) -> list:
         """Get all sessions sorted by creation date (newest first)."""
         if not self.connected or self.db is None:
             return []
         cursor = self.db.sessions.find().sort("created_at", -1).limit(limit)
         return [{**doc, "_id": str(doc["_id"])} for doc in cursor]
+    
+    def delete_session(self, session_id: str) -> bool:
+        """Delete a session by ID."""
+        if not self.connected or self.db is None:
+            return False
+        try:
+            result = self.db.sessions.delete_one({"_id": ObjectId(session_id)})
+            return result.deleted_count > 0
+        except Exception:
+            return False
     
     # Queries
     def log_query(self, user_query: str, session_id: Optional[str] = None) -> str:

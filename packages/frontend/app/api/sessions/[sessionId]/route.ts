@@ -60,3 +60,63 @@ export async function GET(
   }
 }
 
+export async function DELETE(
+  req: Request,
+  { params }: { params: Promise<{ sessionId: string }> | { sessionId: string } }
+) {
+  try {
+    const resolvedParams = await Promise.resolve(params)
+    const { sessionId } = resolvedParams
+
+    if (!sessionId) {
+      return new Response(
+        JSON.stringify({ error: "Session ID is required" }),
+        { 
+          status: 400,
+          headers: { "Content-Type": "application/json" }
+        }
+      )
+    }
+
+    const backendResponse = await fetch(`${BACKEND_URL}/api/sessions/${sessionId}`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    })
+
+    if (!backendResponse.ok) {
+      const errorText = await backendResponse.text()
+      
+      return new Response(
+        JSON.stringify({ 
+          error: "Failed to delete session",
+          details: errorText 
+        }),
+        { 
+          status: backendResponse.status,
+          headers: { "Content-Type": "application/json" }
+        }
+      )
+    }
+
+    const data = await backendResponse.json()
+    return new Response(JSON.stringify(data), {
+      headers: {
+        "Content-Type": "application/json",
+      },
+    })
+  } catch (error) {
+    return new Response(
+      JSON.stringify({ 
+        error: "Failed to delete session",
+        message: error instanceof Error ? error.message : "Unknown error"
+      }),
+      { 
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      }
+    )
+  }
+}
+
