@@ -82,6 +82,13 @@ class MongoDBClient:
         except Exception:
             pass
     
+    def get_all_sessions(self, limit: int = 100) -> list:
+        """Get all sessions sorted by creation date (newest first)."""
+        if not self.connected or self.db is None:
+            return []
+        cursor = self.db.sessions.find().sort("created_at", -1).limit(limit)
+        return [{**doc, "_id": str(doc["_id"])} for doc in cursor]
+    
     # Queries
     def log_query(self, user_query: str, session_id: Optional[str] = None) -> str:
         if not self.connected or self.db is None:

@@ -76,6 +76,14 @@ async def create_session():
     return {"session_id": session_id}
 
 
+@app.get("/api/sessions")
+async def get_all_sessions(limit: int = 100):
+    """Get all sessions."""
+    db = get_db_client()
+    sessions = db.get_all_sessions(limit)
+    return {"sessions": sessions}
+
+
 @app.get("/api/sessions/{session_id}")
 async def get_session(session_id: str):
     """Get session details including message history."""
