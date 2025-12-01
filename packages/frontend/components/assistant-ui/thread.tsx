@@ -126,7 +126,7 @@ const ThreadScrollToBottom: FC = () => {
 
 const ThreadWelcome: FC = () => {
   return (
-    <div className="aui-thread-welcome-root mx-auto my-auto flex w-full max-w-[var(--thread-max-width)] flex-grow flex-col">
+    <div className="aui-thread-welcome-root mx-auto my-auto flex !w-[calc(100vw/3)] flex-grow flex-col">
       <div className="aui-thread-welcome-center flex w-full flex-grow flex-col items-center justify-center">
         <div className="aui-thread-welcome-message flex size-full flex-col justify-center px-8">
           <m.div
@@ -202,7 +202,7 @@ const ThreadSuggestions: FC = () => {
 
 const Composer: FC = () => {
   return (
-    <div className="aui-composer-wrapper sticky bottom-0 mx-auto flex w-full max-w-[var(--thread-max-width)] flex-col gap-4 overflow-visible bg-background pb-4 md:pb-6">
+    <div className="aui-composer-wrapper sticky bottom-0 mx-auto !w-[calc(100vw/3)] gap-4 overflow-visible bg-background pb-4 md:pb-6">
       <ThreadScrollToBottom />
       <ComposerPrimitive.Root 
         className="aui-composer-root group/input-group relative flex w-full flex-col rounded-xl border border-border !bg-input px-1 pt-2 shadow-xs transition-[color,box-shadow] outline-none has-[textarea:focus-visible]:ring-ring/50"
@@ -452,7 +452,7 @@ const AssistantMessage: FC = () => {
   return (
     <MessagePrimitive.Root asChild>
       <div
-        className="aui-assistant-message-root relative mx-auto w-full max-w-[var(--thread-max-width)] animate-in py-4 duration-150 ease-out fade-in slide-in-from-bottom-1 last:mb-24"
+        className="aui-assistant-message-root relative mx-auto !w-[calc(100vw/3)] animate-in py-4 duration-150 ease-out fade-in slide-in-from-bottom-1 last:mb-24"
         data-role="assistant"
       >
         {/* Agent activity timeline - always visible when there's data */}
@@ -508,7 +508,7 @@ const UserMessage: FC = () => {
   return (
     <MessagePrimitive.Root asChild>
       <div
-        className="mx-auto flex w-full max-w-[var(--thread-max-width)] flex-col gap-y-2 px-2 py-4 animate-in duration-150 ease-out fade-in slide-in-from-bottom-1 first:mt-3 last:mb-5"
+        className="mx-auto flex !w-[calc(100vw/3)] flex-col gap-y-2 px-2 py-4 animate-in duration-150 ease-out fade-in slide-in-from-bottom-1 first:mt-3 last:mb-5"
         data-role="user"
       >
         <div className="aui-user-message-content-wrapper relative ml-auto flex min-w-0 max-w-[85%] flex-col items-end gap-2">
@@ -549,7 +549,7 @@ const UserActionBar: FC = () => {
 
 const EditComposer: FC = () => {
   return (
-    <div className="aui-edit-composer-wrapper mx-auto flex w-full max-w-[var(--thread-max-width)] flex-col gap-4 px-2 first:mt-4">
+    <div className="aui-edit-composer-wrapper mx-auto flex !w-[calc(100vw/3)] flex-col gap-4 px-2 first:mt-4">
       <ComposerPrimitive.Root className="aui-edit-composer-root ml-auto flex w-full max-w-7/8 flex-col bg-muted">
         <ComposerPrimitive.Input
           className="aui-edit-composer-input flex min-h-[60px] w-full resize-none bg-transparent p-4 text-foreground outline-none"
