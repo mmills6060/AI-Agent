@@ -45,32 +45,32 @@ import { cn } from "@/lib/utils";
 const agentConfig: Record<string, { icon: typeof BrainCircuit; color: string; bgColor: string; label: string }> = {
   orchestrator: { 
     icon: BrainCircuit, 
-    color: "text-purple-400",
-    bgColor: "bg-purple-500/10",
+    color: "text-muted-foreground",
+    bgColor: "bg-muted-foreground/10",
     label: "Planning" 
   },
   researcher: { 
     icon: Search, 
-    color: "text-blue-400",
-    bgColor: "bg-blue-500/10",
+    color: "text-muted-foreground",
+    bgColor: "bg-muted-foreground/10",
     label: "Researching" 
   },
   validator: { 
     icon: CheckCircle2, 
-    color: "text-green-400",
-    bgColor: "bg-green-500/10",
+    color: "text-muted-foreground",
+    bgColor: "bg-muted-foreground/10",
     label: "Validating" 
   },
   synthesizer: { 
     icon: FileText, 
-    color: "text-amber-400",
-    bgColor: "bg-amber-500/10",
+    color: "text-muted-foreground",
+    bgColor: "bg-muted-foreground/10",
     label: "Synthesizing" 
   },
   simple_response: { 
     icon: Sparkles, 
-    color: "text-cyan-400",
-    bgColor: "bg-cyan-500/10",
+    color: "text-muted-foreground",
+    bgColor: "bg-muted-foreground/10",
     label: "Responding" 
   },
 };
@@ -85,7 +85,7 @@ export const Thread: FC = () => {
             ["--thread-max-width" as string]: "100%",
           }}
         >
-          <ThreadPrimitive.Viewport className="relative flex flex-1 flex-col overflow-x-auto overflow-y-scroll px-4">
+          <ThreadPrimitive.Viewport className="relative flex flex-1 flex-col overflow-x-auto overflow-y-sioll px-4">
             <ThreadPrimitive.If empty>
               <ThreadWelcome />
             </ThreadPrimitive.If>
@@ -414,21 +414,6 @@ const AgentActivityInline: FC = () => {
             </m.div>
           )
         })}
-
-        {/* Completion indicator */}
-        {isComplete && (
-          <m.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.2 }}
-            className="flex items-center gap-2 ml-8 mt-1"
-          >
-            <div className="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/10">
-              <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-            </div>
-            <span className="text-xs font-medium text-emerald-500">Complete</span>
-          </m.div>
-        )}
 
         {/* Thinking indicator when no history yet */}
         {isProcessing && agentHistory.length === 0 && (
