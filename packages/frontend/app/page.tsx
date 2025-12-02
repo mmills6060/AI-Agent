@@ -1,8 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { ConversationList } from "@/components/ConversationList/conversation-list"
-import { Thread } from "@/components/Thread/thread"
+import { ConversationList } from "@/components/conversation-list/conversation-list"
+import { Thread } from "@/components/thread/thread"
 
 export default function Home() {
 

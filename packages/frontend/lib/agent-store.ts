@@ -1,11 +1,5 @@
 import { create } from "zustand"
-
-interface AgentActivity {
-  agent: string
-  action: string
-  output: string | Record<string, unknown>
-  timestamp: number
-}
+import type { AgentActivity, AgentActivityInput } from "./types"
 
 interface AgentState {
   activeAgent: string | null
@@ -13,7 +7,7 @@ interface AgentState {
   sessionId: string | null
   isProcessing: boolean
   setActiveAgent: (agent: string | null) => void
-  addAgentActivity: (activity: Omit<AgentActivity, "timestamp">) => void
+  addAgentActivity: (activity: AgentActivityInput) => void
   clearHistory: () => void
   setAgentHistory: (history: AgentActivity[]) => void
   setSessionId: (id: string | null) => void

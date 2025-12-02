@@ -1,6 +1,6 @@
-export const maxDuration = 60
+import { BACKEND_URL } from "@/lib/constants"
 
-const BACKEND_URL = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
+export const maxDuration = 60
 
 export async function POST(req: Request) {
   try {

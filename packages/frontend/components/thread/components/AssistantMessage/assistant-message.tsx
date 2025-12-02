@@ -1,12 +1,12 @@
 import { CheckIcon, CopyIcon, RefreshCwIcon } from "lucide-react"
 import { ActionBarPrimitive, MessagePrimitive } from "@assistant-ui/react"
 import { type FC } from "react"
-import { MarkdownText } from "@/components/Thread/components/AssistantMessage/components/markdown-text"
-import { ToolFallback } from "@/components/Thread/components/AssistantMessage/components/tool-fallback"
+import { MarkdownText } from "@/components/thread/components/AssistantMessage/components/markdown-text"
+import { ToolFallback } from "@/components/thread/components/AssistantMessage/components/tool-fallback"
 import { TooltipIconButton } from "@/components/ui/tooltip-icon-button"
-import { MessageError } from "@/components/Thread/components/AssistantMessage/components/message-error"
-import { BranchPicker } from "@/components/Thread/components/AssistantMessage/components/branch-picker"
-import { AgentActivityInline } from "@/components/Thread/components/AssistantMessage/components/agent-activity-inline"
+import { MessageError } from "@/components/thread/components/AssistantMessage/components/message-error"
+import { BranchPicker } from "@/components/thread/components/AssistantMessage/components/branch-picker"
+import { AgentActivityInline } from "@/components/thread/components/AssistantMessage/components/agent-activity-inline"
 
 export const AssistantMessage: FC = () => {
   return (

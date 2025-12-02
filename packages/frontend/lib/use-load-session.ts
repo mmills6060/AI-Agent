@@ -1,25 +1,9 @@
 import { useThreadRuntime } from "@assistant-ui/react"
 import { useAgentStore } from "./agent-store"
+import type { Session, SessionMessage, AgentActivity } from "./types"
 
-interface SessionMessage {
-  role: string
-  content: string
-  timestamp?: string
-}
-
-interface AgentActivity {
-  agent: string
-  action: string
-  output: string | Record<string, unknown>
-  timestamp?: number
-}
-
-interface Session {
-  _id: string
-  created_at: string
-  messages: SessionMessage[]
-  agent_history?: Record<string, AgentActivity[]>
-}
+// Stored AgentActivity may have optional timestamp, but we convert to required timestamp
+type StoredAgentActivity = Omit<AgentActivity, "timestamp"> & { timestamp?: number }
 
 export function useLoadSession() {
   const thread = useThreadRuntime()
@@ -49,18 +33,18 @@ export function useLoadSession() {
         
         // Process all agent_history entries
         for (const queryId in session.agent_history) {
-          const history = session.agent_history[queryId]
+          const history = session.agent_history[queryId] as StoredAgentActivity[]
           if (Array.isArray(history) && history.length > 0) {
             // Convert stored history to AgentActivity format
             // Use sequential timestamps to maintain order
-            const convertedHistory = history.map((activity, index) => ({
+            const convertedHistory: AgentActivity[] = history.map((activity, index) => ({
               agent: activity.agent,
               action: activity.action,
               output: activity.output,
               timestamp: activity.timestamp || (baseTimestamp + index * 1000),
             }))
             // Find the maximum timestamp in this history
-            const maxTimestamp = Math.max(...convertedHistory.map(a => a.timestamp || 0))
+            const maxTimestamp = Math.max(...convertedHistory.map(a => a.timestamp))
             allHistories.push({ queryId, history: convertedHistory, maxTimestamp })
             baseTimestamp += history.length * 1000 // Increment for next query
           }

@@ -5,9 +5,9 @@ import { Button } from "@/components/ui/button"
 import {
   ComposerAddAttachment,
   ComposerAttachments,
-} from "@/components/Thread/attachment"
+} from "@/components/thread/attachment"
 import { TooltipIconButton } from "@/components/ui/tooltip-icon-button"
-import { ThreadScrollToBottom } from "@/components/Thread/components/thread-scroll-to-bottom"
+import { ThreadScrollToBottom } from "@/components/thread/components/thread-scroll-to-bottom"
 
 export const Composer: FC = () => {
   return (

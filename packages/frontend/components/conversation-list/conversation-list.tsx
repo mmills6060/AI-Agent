@@ -13,20 +13,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
-import { useAgentStore } from "@/lib/agent-store"
 import { useLoadSession } from "@/lib/use-load-session"
 import { useThreadRuntime } from "@assistant-ui/react"
-import { deleteSession } from "./handlers/delete-session"
-
-interface Session {
-  _id: string
-  created_at: string
-  messages: Array<{
-    role: string
-    content: string
-    timestamp?: string
-  }>
-}
+import { formatDate } from "@/util/formatDate"
+import type { Session } from "@/lib/types"
+import { handleNewConversation } from "./handlers/handleNewConversation"
+import { handleSelectSession } from "./handlers/handleSelectSession"
+import { handleConfirmDelete } from "./handlers/handleConfirmDelete"
 
 interface ConversationListProps {
   onSelectSession?: (sessionId: string) => void
@@ -54,17 +47,14 @@ export const ConversationList: FC<ConversationListProps> = ({
       
       if (!response.ok) {
         const errorText = await response.text()
-        console.error("API error:", response.status, errorText)
-        throw new Error(`Failed to fetch sessions: ${response.status}`)
+        throw new Error(`Failed to fetch sessions: ${response.status} ${errorText}`)
       }
       
       const data = await response.json()
-      console.log("Fetched sessions:", data)
       setSessions(data.sessions || [])
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to load conversations"
       setError(errorMessage)
-      console.error("Error fetching sessions:", err)
     } finally {
       setIsLoading(false)
     }
@@ -73,43 +63,6 @@ export const ConversationList: FC<ConversationListProps> = ({
   useEffect(() => {
     fetchSessions()
   }, [])
-
-  const handleNewConversation = () => {
-    try {
-      // Safely reset thread if available
-      if (thread?.reset) {
-        try {
-          // Try resetting with empty array first, fallback to no args
-          thread.reset([])
-        } catch (resetError) {
-          // If reset fails, continue with other cleanup
-          console.warn("Thread reset failed, continuing with cleanup:", resetError)
-        }
-      }
-      useAgentStore.getState().setSessionId(null)
-      useAgentStore.getState().clearHistory()
-      if (onSelectSession) {
-        onSelectSession("")
-      }
-    } catch (error) {
-      console.error("Failed to clear conversation:", error)
-    }
-  }
-
-  const handleSelectSession = async (sessionId: string) => {
-    try {
-      setLoadingSessionId(sessionId)
-      await loadSession(sessionId)
-      if (onSelectSession) {
-        onSelectSession(sessionId)
-      }
-    } catch (error) {
-      console.error("Failed to load session:", error)
-      setError("Failed to load conversation")
-    } finally {
-      setLoadingSessionId(null)
-    }
-  }
 
   const getConversationTitle = (session: Session): string => {
     const firstUserMessage = session.messages?.find(msg => msg.role === "user")
@@ -120,65 +73,9 @@ export const ConversationList: FC<ConversationListProps> = ({
     return "New Conversation"
   }
 
-  const formatDate = (dateString: string): string => {
-    try {
-      const date = new Date(dateString)
-      const now = new Date()
-      const diffMs = now.getTime() - date.getTime()
-      const diffMins = Math.floor(diffMs / 60000)
-      const diffHours = Math.floor(diffMs / 3600000)
-      const diffDays = Math.floor(diffMs / 86400000)
-
-      if (diffMins < 1) return "Just now"
-      if (diffMins < 60) return `${diffMins}m ago`
-      if (diffHours < 24) return `${diffHours}h ago`
-      if (diffDays < 7) return `${diffDays}d ago`
-      
-      return date.toLocaleDateString()
-    } catch {
-      return ""
-    }
-  }
-
   const handleDeleteClick = (e: React.MouseEvent, session: Session) => {
     e.stopPropagation()
     setSessionToDelete(session)
-  }
-
-  const handleConfirmDelete = async () => {
-    if (!sessionToDelete) return
-
-    try {
-      setDeletingSessionId(sessionToDelete._id)
-      await deleteSession(sessionToDelete._id)
-      
-      // Remove from list
-      setSessions(prev => prev.filter(s => s._id !== sessionToDelete._id))
-      
-      // If deleted session was selected, clear selection
-      if (selectedSessionId === sessionToDelete._id) {
-        if (thread?.reset) {
-          try {
-            thread.reset([])
-          } catch (resetError) {
-            console.warn("Thread reset failed:", resetError)
-          }
-        }
-        useAgentStore.getState().setSessionId(null)
-        useAgentStore.getState().clearHistory()
-        if (onSelectSession) {
-          onSelectSession("")
-        }
-      }
-      
-      setSessionToDelete(null)
-    } catch (error) {
-      console.error("Failed to delete session:", error)
-      setError("Failed to delete conversation")
-      setSessionToDelete(null)
-    } finally {
-      setDeletingSessionId(null)
-    }
   }
 
   const handleCancelDelete = () => {
@@ -189,7 +86,7 @@ export const ConversationList: FC<ConversationListProps> = ({
     <div className="flex flex-col h-full w-[250px] bg-background border-r-2 border-border relative z-10">
       <div className="p-3 border-b border-border shrink-0">
         <Button
-          onClick={handleNewConversation}
+          onClick={() => handleNewConversation({ thread, onSelectSession })}
           className="w-full flex items-center justify-start gap-2"
           variant="ghost"
         >
@@ -232,7 +129,13 @@ export const ConversationList: FC<ConversationListProps> = ({
                   )}
                 >
                   <button
-                    onClick={() => handleSelectSession(session._id)}
+                    onClick={() => handleSelectSession({
+                      sessionId: session._id,
+                      loadSession,
+                      setLoadingSessionId,
+                      setError,
+                      onSelectSession,
+                    })}
                     disabled={loadingSessionId === session._id || isDeleting}
                     className={cn(
                       "flex flex-col gap-1 px-3 py-2 rounded-lg text-left transition-all flex-1",
@@ -305,7 +208,16 @@ export const ConversationList: FC<ConversationListProps> = ({
             </Button>
             <Button
               variant="destructive"
-              onClick={handleConfirmDelete}
+              onClick={() => handleConfirmDelete({
+                sessionToDelete: sessionToDelete!,
+                selectedSessionId: selectedSessionId!,
+                thread,
+                setDeletingSessionId,
+                setSessions,
+                setSessionToDelete,
+                setError,
+                onSelectSession,
+              })}
               disabled={!!deletingSessionId}
             >
               {deletingSessionId ? "Deleting..." : "Delete"}
