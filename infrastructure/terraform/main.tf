@@ -501,7 +501,23 @@ resource "aws_lb_listener" "http" {
 }
 
 # Path-based routing for API endpoints
-resource "aws_lb_listener_rule" "backend_python_api" {
+resource "aws_lb_listener_rule" "backend_python_sessions" {
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 80
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.backend_python.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/api/*"]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "backend_python_agent" {
   listener_arn = aws_lb_listener.http.arn
   priority     = 90
 

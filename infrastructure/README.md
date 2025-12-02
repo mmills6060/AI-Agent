@@ -130,8 +130,7 @@ The Application Load Balancer routes traffic based on path:
 | Path Pattern | Target |
 |--------------|--------|
 | `/` (default) | Frontend (Next.js) |
-| `/api/*` | Backend Node (Express) |
-| `/api-docs*` | Backend Node (Swagger) |
+| `/api/*` | Backend Python (FastAPI) |
 | `/agent/*` | Backend Python (FastAPI) |
 | `/agent-api/*` | Backend Python (FastAPI) |
 
@@ -139,15 +138,8 @@ The Application Load Balancer routes traffic based on path:
 
 ### Frontend
 - `NODE_ENV` - production
-- `NEXT_PUBLIC_API_URL` - Backend Node URL
-- `NEXT_PUBLIC_PYTHON_API_URL` - Backend Python URL
-
-### Backend Node
-- `NODE_ENV` - production
-- `PORT` - 3001
-- `OPENAI_API_KEY` - From Secrets Manager
-- `SUPABASE_URL` - From Secrets Manager
-- `SUPABASE_SERVICE_KEY` - From Secrets Manager
+- `NEXT_PUBLIC_API_URL` - Application Load Balancer URL (routes to Backend Python)
+- `NEXT_PUBLIC_PYTHON_API_URL` - Application Load Balancer URL with /agent-api path
 
 ### Backend Python
 - `HOST` - 0.0.0.0
@@ -164,7 +156,6 @@ Adjust the desired count variables in `terraform.tfvars`:
 
 ```hcl
 frontend_desired_count       = 2
-backend_node_desired_count   = 2
 backend_python_desired_count = 2
 ```
 
@@ -185,9 +176,6 @@ aws ecs update-service \
 # Frontend logs
 aws logs tail /ecs/ai-agent-prod/frontend --follow
 
-# Backend Node logs
-aws logs tail /ecs/ai-agent-prod/backend-node --follow
-
 # Backend Python logs
 aws logs tail /ecs/ai-agent-prod/backend-python --follow
 ```
@@ -197,7 +185,7 @@ aws logs tail /ecs/ai-agent-prod/backend-python --follow
 ```bash
 aws ecs describe-services \
   --cluster ai-agent-prod-cluster \
-  --services ai-agent-prod-frontend ai-agent-prod-backend-node ai-agent-prod-backend-python
+  --services ai-agent-prod-frontend ai-agent-prod-backend-python
 ```
 
 ## Cost Optimization
