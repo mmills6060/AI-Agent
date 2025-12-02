@@ -294,6 +294,43 @@ resource "aws_ecr_lifecycle_policy" "backend_python" {
 }
 
 # ============================================================================
+# AWS CLOUD MAP (SERVICE DISCOVERY)
+# ============================================================================
+
+resource "aws_service_discovery_private_dns_namespace" "main" {
+  name        = "${local.name_prefix}.local"
+  description = "Private DNS namespace for service discovery"
+  vpc         = aws_vpc.main.id
+
+  tags = {
+    Name = "${local.name_prefix}-service-discovery"
+  }
+}
+
+resource "aws_service_discovery_service" "backend_python" {
+  name = "backend-python"
+
+  dns_config {
+    namespace_id = aws_service_discovery_private_dns_namespace.main.id
+
+    dns_records {
+      ttl  = 10
+      type = "A"
+    }
+
+    routing_policy = "MULTIVALUE"
+  }
+
+  health_check_custom_config {
+    failure_threshold = 1
+  }
+
+  tags = {
+    Name = "${local.name_prefix}-backend-python-discovery"
+  }
+}
+
+# ============================================================================
 # ECS CLUSTER
 # ============================================================================
 
@@ -500,8 +537,11 @@ resource "aws_lb_listener" "http" {
   }
 }
 
-# Path-based routing for API endpoints
-resource "aws_lb_listener_rule" "backend_python_sessions" {
+# Path-based routing for API endpoints  
+# Note: This routes /api/* to Python backend directly
+# If you want Next.js API routes to handle requests, remove this rule
+# and ensure BACKEND_URL uses service discovery instead of ALB
+resource "aws_lb_listener_rule" "backend_python_api" {
   listener_arn = aws_lb_listener.http.arn
   priority     = 80
 
@@ -565,16 +605,16 @@ resource "aws_ecs_task_definition" "frontend" {
           value = "production"
         },
         {
-          name  = "BACKEND_URL"
-          value = "http://${aws_lb.main.dns_name}"
-        },
-        {
           name  = "NEXT_PUBLIC_API_URL"
           value = "http://${aws_lb.main.dns_name}"
         },
         {
           name  = "NEXT_PUBLIC_PYTHON_API_URL"
           value = "http://${aws_lb.main.dns_name}/agent-api"
+        },
+        {
+          name  = "BACKEND_URL"
+          value = "http://backend-python.${aws_service_discovery_private_dns_namespace.main.name}:8000"
         }
       ]
 
@@ -713,6 +753,10 @@ resource "aws_ecs_service" "backend_python" {
     target_group_arn = aws_lb_target_group.backend_python.arn
     container_name   = "backend-python"
     container_port   = 8000
+  }
+
+  service_registries {
+    registry_arn = aws_service_discovery_service.backend_python.arn
   }
 
   depends_on = [aws_lb_listener.http]
