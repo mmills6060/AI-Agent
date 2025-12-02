@@ -1,5 +1,7 @@
 import Link from 'next/link'
 import { DocsNav } from '@/components/docs/docs-nav'
+import { buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 const sections = [
   {
@@ -32,6 +34,15 @@ const sections = [
 export default function Docs() {
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <Link
+        href="/"
+        className={cn(
+          buttonVariants({ variant: "outline", size: "sm" }),
+          "absolute top-4 right-4 z-50"
+        )}
+      >
+        App
+      </Link>
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           <DocsNav />
