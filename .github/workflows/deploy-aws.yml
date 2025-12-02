@@ -28,8 +28,7 @@ jobs:
 
     outputs:
       frontend_image: ${{ steps.build-frontend.outputs.image }}
-      backend_node_image: ${{ steps.build-backend-node.outputs.image }}
-      backend_python_image: ${{ steps.build-backend-python.outputs.image }}
+      backend_image: ${{ steps.build-backend.outputs.image }}
 
     steps:
       - name: Checkout repository
@@ -67,10 +66,10 @@ jobs:
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
       - name: Build and push backend-node image
-        id: build-backend-node
+        id: build-backend
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ env.PROJECT_NAME }}-prod/backend-node
+          ECR_REPOSITORY: ${{ env.PROJECT_NAME }}-prod/backend
           IMAGE_TAG: ${{ github.sha }}
         run: |
           docker build \
@@ -81,17 +80,17 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-      - name: Build and push backend-python image
-        id: build-backend-python
+      - name: Build and push backend image
+        id: build-backend
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ env.PROJECT_NAME }}-prod/backend-python
+          ECR_REPOSITORY: ${{ env.PROJECT_NAME }}-prod/backend
           IMAGE_TAG: ${{ github.sha }}
         run: |
           docker build \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
-            ./packages/backend-python
+            ./packages/backend
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
@@ -119,18 +118,11 @@ jobs:
             --service ${{ env.PROJECT_NAME }}-prod-frontend \
             --force-new-deployment
 
-      - name: Update backend-node ECS service
+      - name: Update backend ECS service
         run: |
           aws ecs update-service \
             --cluster ${{ env.PROJECT_NAME }}-prod-cluster \
-            --service ${{ env.PROJECT_NAME }}-prod-backend-node \
-            --force-new-deployment
-
-      - name: Update backend-python ECS service
-        run: |
-          aws ecs update-service \
-            --cluster ${{ env.PROJECT_NAME }}-prod-cluster \
-            --service ${{ env.PROJECT_NAME }}-prod-backend-python \
+            --service ${{ env.PROJECT_NAME }}-prod-backend \
             --force-new-deployment
 
       - name: Wait for frontend service stability
@@ -139,17 +131,11 @@ jobs:
             --cluster ${{ env.PROJECT_NAME }}-prod-cluster \
             --services ${{ env.PROJECT_NAME }}-prod-frontend
 
-      - name: Wait for backend-node service stability
+      - name: Wait for backend service stability
         run: |
           aws ecs wait services-stable \
             --cluster ${{ env.PROJECT_NAME }}-prod-cluster \
-            --services ${{ env.PROJECT_NAME }}-prod-backend-node
-
-      - name: Wait for backend-python service stability
-        run: |
-          aws ecs wait services-stable \
-            --cluster ${{ env.PROJECT_NAME }}-prod-cluster \
-            --services ${{ env.PROJECT_NAME }}-prod-backend-python
+            --services ${{ env.PROJECT_NAME }}-prod-backend
 
       - name: Deployment Summary
         run: |
@@ -157,6 +143,5 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Images Deployed:" >> $GITHUB_STEP_SUMMARY
           echo "- **Frontend:** \`${{ needs.build-and-push.outputs.frontend_image }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Backend Node:** \`${{ needs.build-and-push.outputs.backend_node_image }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Backend Python:** \`${{ needs.build-and-push.outputs.backend_python_image }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Backend:** \`${{ needs.build-and-push.outputs.backend_image }}\`" >> $GITHUB_STEP_SUMMARY
 
