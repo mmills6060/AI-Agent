@@ -74,10 +74,143 @@ class ResearcherAgent:
         }
     
     async def extract_content(self, urls: list[str]) -> list[dict]:
-        """Extract full content from URLs using Tavily extract API."""
+        """
+        Extract full content from URLs using Tavily extract API.
+        
+        Args:
+            urls: List of URLs to extract content from (max 5)
+            
+        Returns:
+            List of extracted content results
+        """
+        if not urls:
+            return []
+            
         try:
             response = self.tavily.extract(urls=urls[:5])
             return response.get("results", [])
         except Exception as e:
             return [{"error": str(e)}]
+    
+    async def crawl_website(self, url: str, instructions: str = None, max_pages: int = 10) -> dict:
+        """
+        Intelligently crawl a website based on instructions.
+        
+        Args:
+            url: Starting URL to crawl
+            instructions: Optional instructions for what to look for
+            max_pages: Maximum number of pages to crawl (default: 10)
+            
+        Returns:
+            Dictionary containing crawl results
+        """
+        if not url:
+            return {"error": "URL is required"}
+            
+        try:
+            params = {
+                "url": url,
+                "max_pages": max_pages
+            }
+            
+            if instructions:
+                params["instructions"] = instructions
+                
+            response = self.tavily.crawl(**params)
+            return {
+                "url": url,
+                "pages_crawled": len(response.get("results", [])),
+                "results": response.get("results", []),
+                "metadata": response.get("metadata", {})
+            }
+        except Exception as e:
+            return {
+                "url": url,
+                "error": str(e)
+            }
+    
+    async def map_website(self, url: str) -> dict:
+        """
+        Create a structured map of a website's architecture.
+        
+        Args:
+            url: Website URL to map
+            
+        Returns:
+            Dictionary containing the site map structure
+        """
+        if not url:
+            return {"error": "URL is required"}
+            
+        try:
+            response = self.tavily.map(url=url)
+            return {
+                "url": url,
+                "sitemap": response.get("sitemap", []),
+                "total_pages": len(response.get("sitemap", [])),
+                "metadata": response.get("metadata", {})
+            }
+        except Exception as e:
+            return {
+                "url": url,
+                "error": str(e)
+            }
+    
+    async def search_advanced(
+        self, 
+        query: str,
+        search_depth: str = "advanced",
+        max_results: int = 5,
+        include_answer: bool = True,
+        include_raw_content: bool = False,
+        include_domains: list[str] = None,
+        exclude_domains: list[str] = None
+    ) -> dict:
+        """
+        Advanced search with additional parameters.
+        
+        Args:
+            query: Search query string
+            search_depth: "basic" or "advanced" (default: "advanced")
+            max_results: Maximum number of results (default: 5)
+            include_answer: Include AI-generated answer (default: True)
+            include_raw_content: Include raw HTML content (default: False)
+            include_domains: List of domains to include
+            exclude_domains: List of domains to exclude
+            
+        Returns:
+            Dictionary containing search results
+        """
+        if not query:
+            return {"error": "Query is required"}
+            
+        try:
+            params = {
+                "query": query,
+                "search_depth": search_depth,
+                "max_results": max_results,
+                "include_answer": include_answer,
+                "include_raw_content": include_raw_content
+            }
+            
+            if include_domains:
+                params["include_domains"] = include_domains
+                
+            if exclude_domains:
+                params["exclude_domains"] = exclude_domains
+                
+            response = self.tavily.search(**params)
+            
+            return {
+                "query": query,
+                "answer": response.get("answer", ""),
+                "results": response.get("results", []),
+                "images": response.get("images", []),
+                "metadata": response.get("metadata", {})
+            }
+        except Exception as e:
+            return {
+                "query": query,
+                "error": str(e)
+            }
 
