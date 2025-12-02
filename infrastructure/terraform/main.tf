@@ -565,6 +565,10 @@ resource "aws_ecs_task_definition" "frontend" {
           value = "production"
         },
         {
+          name  = "BACKEND_URL"
+          value = "http://${aws_lb.main.dns_name}"
+        },
+        {
           name  = "NEXT_PUBLIC_API_URL"
           value = "http://${aws_lb.main.dns_name}"
         },
