@@ -1,7 +1,7 @@
 "use client";
 
 import { type FC } from "react";
-import { Thread } from "@/components/assistant-ui/thread";
+import { Thread } from "@/components/Thread/thread";
 
 export const AssistantModal: FC = () => {
   return (

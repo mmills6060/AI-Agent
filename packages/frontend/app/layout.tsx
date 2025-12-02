@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google"
 import "./globals.css"
-import { AssistantProvider } from "@/components/assistant-ui/assistant-provider"
+import { AssistantProvider } from "@/components/Providers/assistant-provider"
 
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],

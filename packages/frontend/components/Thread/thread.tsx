@@ -1,11 +1,11 @@
 import { LazyMotion, MotionConfig, domAnimation } from "motion/react"
 import { ThreadPrimitive } from "@assistant-ui/react"
 import { type FC } from "react"
-import { ThreadWelcome } from "@/components/assistant-ui/thread-welcome"
-import { Composer } from "@/components/assistant-ui/composer"
-import { UserMessage } from "@/components/assistant-ui/user-message"
-import { EditComposer } from "@/components/assistant-ui/edit-composer"
-import { AssistantMessage } from "@/components/assistant-ui/assistant-message"
+import { ThreadWelcome } from "@/components/Thread/components/thread-welcome"
+import { Composer } from "@/components/Thread/components/composer"
+import { UserMessage } from "@/components/Thread/components/user-message"
+import { EditComposer } from "@/components/Thread/components/edit-composer"
+import { AssistantMessage } from "@/components/Thread/components/AssistantMessage/assistant-message"
 
 export const Thread: FC = () => {
   return (

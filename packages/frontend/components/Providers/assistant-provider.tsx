@@ -6,7 +6,7 @@ import {
   type ChatModelAdapter,
   type ChatModelRunResult
 } from "@assistant-ui/react"
-import { AssistantModal } from "./assistant-modal"
+import { AssistantModal } from "../Modals/assistant-modal"
 import { ReactNode } from "react"
 import { useAgentStore } from "@/lib/agent-store"
 

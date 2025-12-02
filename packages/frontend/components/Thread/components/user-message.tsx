@@ -1,9 +1,9 @@
 import { PencilIcon } from "lucide-react"
 import { ActionBarPrimitive, MessagePrimitive } from "@assistant-ui/react"
 import { type FC } from "react"
-import { UserMessageAttachments } from "@/components/assistant-ui/attachment"
-import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button"
-import { BranchPicker } from "@/components/assistant-ui/branch-picker"
+import { UserMessageAttachments } from "@/components/Thread/attachment"
+import { TooltipIconButton } from "@/components/ui/tooltip-icon-button"
+import { BranchPicker } from "@/components/Thread/components/AssistantMessage/components/branch-picker"
 
 export const UserMessage: FC = () => {
   return (

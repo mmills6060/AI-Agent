@@ -1,7 +1,7 @@
 import { ArrowDownIcon } from "lucide-react"
 import { ThreadPrimitive } from "@assistant-ui/react"
 import { type FC } from "react"
-import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button"
+import { TooltipIconButton } from "@/components/ui/tooltip-icon-button"
 
 export const ThreadScrollToBottom: FC = () => {
   return (
