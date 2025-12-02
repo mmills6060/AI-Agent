@@ -34,6 +34,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set environment
+        id: set-env
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+          else
+            echo "environment=prod" >> $GITHUB_OUTPUT
+          fi
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -48,34 +57,33 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Get ALB DNS name
+        id: get-alb-dns
+        run: |
+          ALB_NAME="${{ env.PROJECT_NAME }}-${{ steps.set-env.outputs.environment }}-alb"
+          ALB_DNS=$(aws elbv2 describe-load-balancers \
+            --names $ALB_NAME \
+            --query 'LoadBalancers[0].DNSName' \
+            --output text 2>/dev/null || echo "")
+          if [ -z "$ALB_DNS" ] || [ "$ALB_DNS" == "None" ]; then
+            echo "ALB not found, using placeholder"
+            ALB_DNS="your-domain.com"
+          fi
+          echo "dns_name=$ALB_DNS" >> $GITHUB_OUTPUT
+
       - name: Build and push frontend image
         id: build-frontend
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ env.PROJECT_NAME }}-prod/frontend
+          ECR_REPOSITORY: ${{ env.PROJECT_NAME }}-${{ steps.set-env.outputs.environment }}/frontend
           IMAGE_TAG: ${{ github.sha }}
         run: |
           docker build \
-            --build-arg NEXT_PUBLIC_API_URL=https://your-domain.com \
-            --build-arg NEXT_PUBLIC_PYTHON_API_URL=https://your-domain.com/agent-api \
+            --build-arg NEXT_PUBLIC_API_URL=http://${{ steps.get-alb-dns.outputs.dns_name }} \
+            --build-arg NEXT_PUBLIC_PYTHON_API_URL=http://${{ steps.get-alb-dns.outputs.dns_name }}/agent-api \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
             ./packages/frontend
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
-          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
-
-      - name: Build and push backend-node image
-        id: build-backend
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ env.PROJECT_NAME }}-prod/backend
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          docker build \
-            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
-            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
-            ./packages/backend
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
@@ -84,13 +92,20 @@ jobs:
         id: build-backend
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ env.PROJECT_NAME }}-prod/backend
+          ECR_REPOSITORY: ${{ env.PROJECT_NAME }}-${{ steps.set-env.outputs.environment }}/backend-python
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build \
-            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
-            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
-            ./packages/backend
+          if [ -d "./packages/backend-python" ]; then
+            docker build \
+              -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+              -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+              ./packages/backend-python
+          else
+            docker build \
+              -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+              -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+              ./packages/backend
+          fi
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
@@ -104,6 +119,15 @@ jobs:
       contents: read
 
     steps:
+      - name: Set environment
+        id: set-env
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+          else
+            echo "environment=prod" >> $GITHUB_OUTPUT
+          fi
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -114,32 +138,34 @@ jobs:
       - name: Update frontend ECS service
         run: |
           aws ecs update-service \
-            --cluster ${{ env.PROJECT_NAME }}-prod-cluster \
-            --service ${{ env.PROJECT_NAME }}-prod-frontend \
+            --cluster ${{ env.PROJECT_NAME }}-${{ steps.set-env.outputs.environment }}-cluster \
+            --service ${{ env.PROJECT_NAME }}-${{ steps.set-env.outputs.environment }}-frontend \
             --force-new-deployment
 
       - name: Update backend ECS service
         run: |
           aws ecs update-service \
-            --cluster ${{ env.PROJECT_NAME }}-prod-cluster \
-            --service ${{ env.PROJECT_NAME }}-prod-backend \
+            --cluster ${{ env.PROJECT_NAME }}-${{ steps.set-env.outputs.environment }}-cluster \
+            --service ${{ env.PROJECT_NAME }}-${{ steps.set-env.outputs.environment }}-backend-python \
             --force-new-deployment
 
       - name: Wait for frontend service stability
         run: |
           aws ecs wait services-stable \
-            --cluster ${{ env.PROJECT_NAME }}-prod-cluster \
-            --services ${{ env.PROJECT_NAME }}-prod-frontend
+            --cluster ${{ env.PROJECT_NAME }}-${{ steps.set-env.outputs.environment }}-cluster \
+            --services ${{ env.PROJECT_NAME }}-${{ steps.set-env.outputs.environment }}-frontend
 
       - name: Wait for backend service stability
         run: |
           aws ecs wait services-stable \
-            --cluster ${{ env.PROJECT_NAME }}-prod-cluster \
-            --services ${{ env.PROJECT_NAME }}-prod-backend
+            --cluster ${{ env.PROJECT_NAME }}-${{ steps.set-env.outputs.environment }}-cluster \
+            --services ${{ env.PROJECT_NAME }}-${{ steps.set-env.outputs.environment }}-backend-python
 
       - name: Deployment Summary
         run: |
           echo "## Deployment Complete! 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Environment: ${{ steps.set-env.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Images Deployed:" >> $GITHUB_STEP_SUMMARY
           echo "- **Frontend:** \`${{ needs.build-and-push.outputs.frontend_image }}\`" >> $GITHUB_STEP_SUMMARY

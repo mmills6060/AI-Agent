@@ -192,14 +192,6 @@ resource "aws_security_group" "ecs_tasks" {
   }
 
   ingress {
-    description     = "Backend Node from ALB"
-    from_port       = 3001
-    to_port         = 3001
-    protocol        = "tcp"
-    security_groups = [aws_security_group.alb.id]
-  }
-
-  ingress {
     description     = "Backend Python from ALB"
     from_port       = 8000
     to_port         = 8000
@@ -245,19 +237,6 @@ resource "aws_ecr_repository" "frontend" {
   }
 }
 
-resource "aws_ecr_repository" "backend_node" {
-  name                 = "${local.name_prefix}/backend-node"
-  image_tag_mutability = "MUTABLE"
-
-  image_scanning_configuration {
-    scan_on_push = true
-  }
-
-  tags = {
-    Name = "${local.name_prefix}-backend-node-ecr"
-  }
-}
-
 resource "aws_ecr_repository" "backend_python" {
   name                 = "${local.name_prefix}/backend-python"
   image_tag_mutability = "MUTABLE"
@@ -274,27 +253,6 @@ resource "aws_ecr_repository" "backend_python" {
 # ECR Lifecycle policies to clean up old images
 resource "aws_ecr_lifecycle_policy" "frontend" {
   repository = aws_ecr_repository.frontend.name
-
-  policy = jsonencode({
-    rules = [
-      {
-        rulePriority = 1
-        description  = "Keep last 10 images"
-        selection = {
-          tagStatus   = "any"
-          countType   = "imageCountMoreThan"
-          countNumber = 10
-        }
-        action = {
-          type = "expire"
-        }
-      }
-    ]
-  })
-}
-
-resource "aws_ecr_lifecycle_policy" "backend_node" {
-  repository = aws_ecr_repository.backend_node.name
 
   policy = jsonencode({
     rules = [
@@ -453,15 +411,6 @@ resource "aws_cloudwatch_log_group" "frontend" {
   }
 }
 
-resource "aws_cloudwatch_log_group" "backend_node" {
-  name              = "/ecs/${local.name_prefix}/backend-node"
-  retention_in_days = 30
-
-  tags = {
-    Name = "${local.name_prefix}-backend-node-logs"
-  }
-}
-
 resource "aws_cloudwatch_log_group" "backend_python" {
   name              = "/ecs/${local.name_prefix}/backend-python"
   retention_in_days = 30
@@ -514,31 +463,6 @@ resource "aws_lb_target_group" "frontend" {
   }
 }
 
-# Backend Node Target Group
-resource "aws_lb_target_group" "backend_node" {
-  name        = "${local.name_prefix}-backend-node-tg"
-  port        = 3001
-  protocol    = "HTTP"
-  vpc_id      = aws_vpc.main.id
-  target_type = "ip"
-
-  health_check {
-    enabled             = true
-    healthy_threshold   = 2
-    interval            = 30
-    matcher             = "200"
-    path                = "/health"
-    port                = "traffic-port"
-    protocol            = "HTTP"
-    timeout             = 5
-    unhealthy_threshold = 3
-  }
-
-  tags = {
-    Name = "${local.name_prefix}-backend-node-tg"
-  }
-}
-
 # Backend Python Target Group
 resource "aws_lb_target_group" "backend_python" {
   name        = "${local.name_prefix}-backend-python-tg"
@@ -577,22 +501,6 @@ resource "aws_lb_listener" "http" {
 }
 
 # Path-based routing for API endpoints
-resource "aws_lb_listener_rule" "backend_node_api" {
-  listener_arn = aws_lb_listener.http.arn
-  priority     = 100
-
-  action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.backend_node.arn
-  }
-
-  condition {
-    path_pattern {
-      values = ["/api/*", "/api-docs", "/api-docs/*"]
-    }
-  }
-}
-
 resource "aws_lb_listener_rule" "backend_python_api" {
   listener_arn = aws_lb_listener.http.arn
   priority     = 90
@@ -663,70 +571,6 @@ resource "aws_ecs_task_definition" "frontend" {
 
   tags = {
     Name = "${local.name_prefix}-frontend-task"
-  }
-}
-
-resource "aws_ecs_task_definition" "backend_node" {
-  family                   = "${local.name_prefix}-backend-node"
-  network_mode             = "awsvpc"
-  requires_compatibilities = ["FARGATE"]
-  cpu                      = var.backend_node_cpu
-  memory                   = var.backend_node_memory
-  execution_role_arn       = aws_iam_role.ecs_task_execution.arn
-  task_role_arn            = aws_iam_role.ecs_task.arn
-
-  container_definitions = jsonencode([
-    {
-      name      = "backend-node"
-      image     = "${aws_ecr_repository.backend_node.repository_url}:latest"
-      essential = true
-
-      portMappings = [
-        {
-          containerPort = 3001
-          protocol      = "tcp"
-        }
-      ]
-
-      environment = [
-        {
-          name  = "NODE_ENV"
-          value = "production"
-        },
-        {
-          name  = "PORT"
-          value = "3001"
-        }
-      ]
-
-      secrets = [
-        {
-          name      = "OPENAI_API_KEY"
-          valueFrom = "${aws_secretsmanager_secret.app_secrets.arn}:OPENAI_API_KEY::"
-        },
-        {
-          name      = "SUPABASE_URL"
-          valueFrom = "${aws_secretsmanager_secret.app_secrets.arn}:SUPABASE_URL::"
-        },
-        {
-          name      = "SUPABASE_SERVICE_KEY"
-          valueFrom = "${aws_secretsmanager_secret.app_secrets.arn}:SUPABASE_SERVICE_KEY::"
-        }
-      ]
-
-      logConfiguration = {
-        logDriver = "awslogs"
-        options = {
-          "awslogs-group"         = aws_cloudwatch_log_group.backend_node.name
-          "awslogs-region"        = var.aws_region
-          "awslogs-stream-prefix" = "ecs"
-        }
-      }
-    }
-  ])
-
-  tags = {
-    Name = "${local.name_prefix}-backend-node-task"
   }
 }
 
@@ -829,32 +673,6 @@ resource "aws_ecs_service" "frontend" {
 
   tags = {
     Name = "${local.name_prefix}-frontend-service"
-  }
-}
-
-resource "aws_ecs_service" "backend_node" {
-  name            = "${local.name_prefix}-backend-node"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.backend_node.arn
-  desired_count   = var.backend_node_desired_count
-  launch_type     = "FARGATE"
-
-  network_configuration {
-    security_groups  = [aws_security_group.ecs_tasks.id]
-    subnets          = aws_subnet.private[*].id
-    assign_public_ip = false
-  }
-
-  load_balancer {
-    target_group_arn = aws_lb_target_group.backend_node.arn
-    container_name   = "backend-node"
-    container_port   = 3001
-  }
-
-  depends_on = [aws_lb_listener.http]
-
-  tags = {
-    Name = "${local.name_prefix}-backend-node-service"
   }
 }
 

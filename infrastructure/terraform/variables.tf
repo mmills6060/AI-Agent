@@ -41,18 +41,6 @@ variable "frontend_memory" {
   default     = 512
 }
 
-variable "backend_node_cpu" {
-  description = "CPU units for Node.js backend container"
-  type        = number
-  default     = 256
-}
-
-variable "backend_node_memory" {
-  description = "Memory for Node.js backend container (MB)"
-  type        = number
-  default     = 512
-}
-
 variable "backend_python_cpu" {
   description = "CPU units for Python backend container"
   type        = number
@@ -68,12 +56,6 @@ variable "backend_python_memory" {
 # Scaling configurations
 variable "frontend_desired_count" {
   description = "Desired number of frontend containers"
-  type        = number
-  default     = 2
-}
-
-variable "backend_node_desired_count" {
-  description = "Desired number of Node.js backend containers"
   type        = number
   default     = 2
 }
