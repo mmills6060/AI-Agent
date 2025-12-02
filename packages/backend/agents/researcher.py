@@ -2,7 +2,6 @@ from tavily import TavilyClient
 from config.settings import settings
 from db.mongodb import get_db_client
 
-
 class ResearcherAgent:
     def __init__(self):
         self.tavily = TavilyClient(api_key=settings.tavily_api_key)
