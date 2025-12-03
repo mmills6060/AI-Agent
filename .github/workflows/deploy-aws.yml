@@ -8,11 +8,12 @@ on:
       environment:
         description: 'Environment to deploy to'
         required: true
-        default: 'prod'
+        default: 'dev'
         type: choice
         options:
-          - prod
+          - dev
           - staging
+          - prod
 
 env:
   AWS_REGION: us-east-1
@@ -40,7 +41,7 @@ jobs:
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
           else
-            echo "environment=prod" >> $GITHUB_OUTPUT
+            echo "environment=dev" >> $GITHUB_OUTPUT
           fi
 
       - name: Configure AWS credentials
@@ -75,7 +76,7 @@ jobs:
         id: build-frontend
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ env.PROJECT_NAME }}-${{ steps.set-env.outputs.environment }}/frontend
+          ECR_REPOSITORY: ${{ env.PROJECT_NAME }}-${{ steps.set-env.outputs.environment }}-frontend
           IMAGE_TAG: ${{ github.sha }}
         run: |
           docker build \
@@ -92,7 +93,7 @@ jobs:
         id: build-backend
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ env.PROJECT_NAME }}-${{ steps.set-env.outputs.environment }}/backend-python
+          ECR_REPOSITORY: ${{ env.PROJECT_NAME }}-${{ steps.set-env.outputs.environment }}-backend
           IMAGE_TAG: ${{ github.sha }}
         run: |
           if [ -d "./packages/backend-python" ]; then
@@ -125,7 +126,7 @@ jobs:
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
           else
-            echo "environment=prod" >> $GITHUB_OUTPUT
+            echo "environment=dev" >> $GITHUB_OUTPUT
           fi
 
       - name: Configure AWS credentials
@@ -146,7 +147,7 @@ jobs:
         run: |
           aws ecs update-service \
             --cluster ${{ env.PROJECT_NAME }}-${{ steps.set-env.outputs.environment }}-cluster \
-            --service ${{ env.PROJECT_NAME }}-${{ steps.set-env.outputs.environment }}-backend-python \
+            --service ${{ env.PROJECT_NAME }}-${{ steps.set-env.outputs.environment }}-backend \
             --force-new-deployment
 
       - name: Wait for frontend service stability
@@ -159,7 +160,7 @@ jobs:
         run: |
           aws ecs wait services-stable \
             --cluster ${{ env.PROJECT_NAME }}-${{ steps.set-env.outputs.environment }}-cluster \
-            --services ${{ env.PROJECT_NAME }}-${{ steps.set-env.outputs.environment }}-backend-python
+            --services ${{ env.PROJECT_NAME }}-${{ steps.set-env.outputs.environment }}-backend
 
       - name: Deployment Summary
         run: |
