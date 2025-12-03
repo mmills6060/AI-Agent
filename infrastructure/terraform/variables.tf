@@ -148,25 +148,31 @@ variable "mongodb_database" {
 }
 
 # -----------------------------------------------------------------------------
-# Secrets (AWS Secrets Manager ARNs)
+# Secrets (AWS Secrets Manager)
 # -----------------------------------------------------------------------------
 
-variable "openai_api_key_secret_arn" {
-  description = "ARN of the AWS Secrets Manager secret for OpenAI API key"
+variable "secrets_arn" {
+  description = "ARN of the AWS Secrets Manager secret containing all API keys as JSON"
   type        = string
   default     = ""
 }
 
-variable "tavily_api_key_secret_arn" {
-  description = "ARN of the AWS Secrets Manager secret for Tavily API key"
+variable "openai_api_key_json_key" {
+  description = "JSON key name for OpenAI API key in the secrets JSON"
   type        = string
-  default     = ""
+  default     = "OPENAI_API_KEY"
 }
 
-variable "mongodb_uri_secret_arn" {
-  description = "ARN of the AWS Secrets Manager secret for MongoDB URI"
+variable "tavily_api_key_json_key" {
+  description = "JSON key name for Tavily API key in the secrets JSON"
   type        = string
-  default     = ""
+  default     = "TAVILY_API_KEY"
+}
+
+variable "mongodb_uri_json_key" {
+  description = "JSON key name for MongoDB URI in the secrets JSON"
+  type        = string
+  default     = "MONGODB_URI"
 }
 
 # -----------------------------------------------------------------------------

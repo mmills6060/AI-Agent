@@ -660,20 +660,22 @@ resource "aws_ecs_task_definition" "backend" {
         }
       ]
 
-      secrets = [
+      # Secrets from AWS Secrets Manager (JSON secret with multiple keys)
+      # Format: {secret_arn}:{json_key}::
+      secrets = var.secrets_arn != "" ? [
         {
           name      = "OPENAI_API_KEY"
-          valueFrom = var.openai_api_key_secret_arn
+          valueFrom = "${var.secrets_arn}:${var.openai_api_key_json_key}::"
         },
         {
           name      = "TAVILY_API_KEY"
-          valueFrom = var.tavily_api_key_secret_arn
+          valueFrom = "${var.secrets_arn}:${var.tavily_api_key_json_key}::"
         },
         {
           name      = "MONGODB_URI"
-          valueFrom = var.mongodb_uri_secret_arn
+          valueFrom = "${var.secrets_arn}:${var.mongodb_uri_json_key}::"
         }
-      ]
+      ] : []
 
       logConfiguration = {
         logDriver = "awslogs"

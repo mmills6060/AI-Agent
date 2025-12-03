@@ -52,18 +52,24 @@ backend_image_tag      = "latest"
 mongodb_database = "multi_agent_db"
 
 # -----------------------------------------------------------------------------
-# Secrets (AWS Secrets Manager ARNs)
-# Create secrets in AWS Secrets Manager first, then add ARNs here
-# 
-# Example commands to create secrets:
-#   aws secretsmanager create-secret --name ai-agent/openai-api-key --secret-string "sk-..."
-#   aws secretsmanager create-secret --name ai-agent/tavily-api-key --secret-string "tvly-..."
-#   aws secretsmanager create-secret --name ai-agent/mongodb-uri --secret-string "mongodb+srv://..."
+# Secrets (AWS Secrets Manager)
+# Your secrets should be stored as a JSON object in a single secret
+# Example JSON structure:
+#   {
+#     "OPENAI_API_KEY": "sk-...",
+#     "TAVILY_API_KEY": "tvly-...",
+#     "MONGODB_URI": "mongodb+srv://..."
+#   }
+#
+# Get the ARN: aws secretsmanager describe-secret --secret-id ai-agent-prod-secrets --query ARN --output text
 # -----------------------------------------------------------------------------
 
-openai_api_key_secret_arn = "arn:aws:secretsmanager:us-east-1:YOUR_ACCOUNT_ID:secret:ai-agent/openai-api-key-XXXXXX"
-tavily_api_key_secret_arn = "arn:aws:secretsmanager:us-east-1:YOUR_ACCOUNT_ID:secret:ai-agent/tavily-api-key-XXXXXX"
-mongodb_uri_secret_arn    = "arn:aws:secretsmanager:us-east-1:YOUR_ACCOUNT_ID:secret:ai-agent/mongodb-uri-XXXXXX"
+secrets_arn = "arn:aws:secretsmanager:us-east-1:YOUR_ACCOUNT_ID:secret:ai-agent-prod-secrets"
+
+# JSON key names in your secret (update if your keys are named differently)
+openai_api_key_json_key = "OPENAI_API_KEY"
+tavily_api_key_json_key = "TAVILY_API_KEY"
+mongodb_uri_json_key    = "MONGODB_URI"
 
 # -----------------------------------------------------------------------------
 # Feature Flags
