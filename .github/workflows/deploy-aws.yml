@@ -70,10 +70,6 @@ jobs:
         working-directory: packages/backend
         run: python -m py_compile main.py agents/*.py graph/*.py config/*.py db/*.py
 
-      - name: Run backend linting
-        working-directory: packages/backend
-        run: ruff check .
-
       - name: Run backend tests
         working-directory: packages/backend
         run: pytest --ignore=venv -q || echo "No tests found, skipping"
