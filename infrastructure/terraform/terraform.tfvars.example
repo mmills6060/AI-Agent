@@ -1,38 +1,84 @@
-# AWS Configuration
-aws_region = "us-east-1"
+# =============================================================================
+# AI-Agent Terraform Variables Example
+# Copy this file to terraform.tfvars and fill in your values
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# General Configuration
+# -----------------------------------------------------------------------------
+
 project_name = "ai-agent"
-environment = "prod"
+environment  = "dev"  # Options: dev, staging, production
+aws_region   = "us-east-1"
 
-# VPC Configuration
-vpc_cidr = "10.0.0.0/16"
-availability_zones = ["us-east-1a", "us-east-1b"]
+# -----------------------------------------------------------------------------
+# Networking
+# -----------------------------------------------------------------------------
 
-# Container Resource Configurations
-frontend_cpu    = 256
-frontend_memory = 512
+vpc_cidr             = "10.0.0.0/16"
+public_subnet_cidrs  = ["10.0.1.0/24", "10.0.2.0/24"]
+private_subnet_cidrs = ["10.0.10.0/24", "10.0.11.0/24"]
 
-backend_python_cpu    = 512
-backend_python_memory = 1024
+# Enable NAT Gateway for private subnets (recommended for production)
+# Note: NAT Gateways incur additional costs (~$32/month per NAT)
+enable_nat_gateway = false
 
-# Scaling Configuration
-frontend_desired_count       = 2
-backend_python_desired_count = 2
+# -----------------------------------------------------------------------------
+# Frontend Container Configuration
+# -----------------------------------------------------------------------------
 
-# Secrets (provide these via environment variables or GitHub secrets)
-# Do NOT commit actual values to version control!
+frontend_container_port = 3000
+frontend_cpu            = 256   # 0.25 vCPU
+frontend_memory         = 512   # 512 MB
+frontend_desired_count  = 1
+frontend_max_count      = 4
+frontend_image_tag      = "latest"
+
+# -----------------------------------------------------------------------------
+# Backend Container Configuration
+# -----------------------------------------------------------------------------
+
+backend_container_port = 8000
+backend_cpu            = 512    # 0.5 vCPU
+backend_memory         = 1024   # 1 GB
+backend_desired_count  = 1
+backend_max_count      = 4
+backend_image_tag      = "latest"
+
+# -----------------------------------------------------------------------------
+# Database Configuration
+# -----------------------------------------------------------------------------
+
+mongodb_database = "multi_agent_db"
+
+# -----------------------------------------------------------------------------
+# Secrets (AWS Secrets Manager ARNs)
+# Create secrets in AWS Secrets Manager first, then add ARNs here
 # 
-# Option 1: Use environment variables
-#   export TF_VAR_openai_api_key="your-key"
-#   export TF_VAR_tavily_api_key="your-key"
-#   etc.
-#
-# Option 2: Use a secrets.tfvars file (add to .gitignore)
-#   terraform apply -var-file="secrets.tfvars"
+# Example commands to create secrets:
+#   aws secretsmanager create-secret --name ai-agent/openai-api-key --secret-string "sk-..."
+#   aws secretsmanager create-secret --name ai-agent/tavily-api-key --secret-string "tvly-..."
+#   aws secretsmanager create-secret --name ai-agent/mongodb-uri --secret-string "mongodb+srv://..."
+# -----------------------------------------------------------------------------
 
-# openai_api_key       = ""
-# tavily_api_key       = ""
-# mongodb_uri          = ""
-# mongodb_database     = "multi_agent_db"
-# supabase_url         = ""
-# supabase_service_key = ""
+openai_api_key_secret_arn = "arn:aws:secretsmanager:us-east-1:YOUR_ACCOUNT_ID:secret:ai-agent/openai-api-key-XXXXXX"
+tavily_api_key_secret_arn = "arn:aws:secretsmanager:us-east-1:YOUR_ACCOUNT_ID:secret:ai-agent/tavily-api-key-XXXXXX"
+mongodb_uri_secret_arn    = "arn:aws:secretsmanager:us-east-1:YOUR_ACCOUNT_ID:secret:ai-agent/mongodb-uri-XXXXXX"
+
+# -----------------------------------------------------------------------------
+# Feature Flags
+# -----------------------------------------------------------------------------
+
+# Enable CloudWatch Container Insights (additional cost)
+enable_container_insights = false
+
+# Enable auto-scaling based on CPU utilization
+enable_autoscaling = false
+
+# Use Fargate Spot instances for cost savings (up to 70% cheaper)
+# Warning: Spot instances may be interrupted with 2-minute notice
+use_fargate_spot = false
+
+# CloudWatch log retention (days)
+log_retention_days = 14
 

@@ -1,3 +1,8 @@
+# =============================================================================
+# AI-Agent AWS Infrastructure - Terraform Configuration
+# Deploys frontend (Next.js) and backend (Python/FastAPI) containers on ECS
+# =============================================================================
+
 terraform {
   required_version = ">= 1.0"
 
@@ -8,18 +13,20 @@ terraform {
     }
   }
 
-  # Uncomment to use S3 backend for state management
+  # Uncomment to enable remote state (recommended for production)
   # backend "s3" {
   #   bucket         = "your-terraform-state-bucket"
   #   key            = "ai-agent/terraform.tfstate"
   #   region         = "us-east-1"
   #   encrypt        = true
-  #   dynamodb_table = "terraform-state-lock"
+  #   dynamodb_table = "terraform-locks"
   # }
 }
 
 provider "aws" {
   region = var.aws_region
+  # Uncomment and set profile name if using AWS CLI named profiles
+  # profile = "your-profile-name"
 
   default_tags {
     tags = {
@@ -30,13 +37,19 @@ provider "aws" {
   }
 }
 
-locals {
-  name_prefix = "${var.project_name}-${var.environment}"
+# =============================================================================
+# DATA SOURCES
+# =============================================================================
+
+data "aws_availability_zones" "available" {
+  state = "available"
 }
 
-# ============================================================================
-# VPC AND NETWORKING
-# ============================================================================
+data "aws_caller_identity" "current" {}
+
+# =============================================================================
+# VPC & NETWORKING
+# =============================================================================
 
 resource "aws_vpc" "main" {
   cidr_block           = var.vpc_cidr
@@ -44,7 +57,7 @@ resource "aws_vpc" "main" {
   enable_dns_support   = true
 
   tags = {
-    Name = "${local.name_prefix}-vpc"
+    Name = "${var.project_name}-${var.environment}-vpc"
   }
 }
 
@@ -52,51 +65,53 @@ resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 
   tags = {
-    Name = "${local.name_prefix}-igw"
+    Name = "${var.project_name}-${var.environment}-igw"
   }
 }
 
 resource "aws_subnet" "public" {
-  count                   = length(var.availability_zones)
+  count                   = length(var.public_subnet_cidrs)
   vpc_id                  = aws_vpc.main.id
-  cidr_block              = cidrsubnet(var.vpc_cidr, 8, count.index)
-  availability_zone       = var.availability_zones[count.index]
+  cidr_block              = var.public_subnet_cidrs[count.index]
+  availability_zone       = data.aws_availability_zones.available.names[count.index]
   map_public_ip_on_launch = true
 
   tags = {
-    Name = "${local.name_prefix}-public-${count.index + 1}"
-    Type = "Public"
+    Name = "${var.project_name}-${var.environment}-public-${count.index + 1}"
+    Type = "public"
   }
 }
 
 resource "aws_subnet" "private" {
-  count             = length(var.availability_zones)
+  count             = length(var.private_subnet_cidrs)
   vpc_id            = aws_vpc.main.id
-  cidr_block        = cidrsubnet(var.vpc_cidr, 8, count.index + 10)
-  availability_zone = var.availability_zones[count.index]
+  cidr_block        = var.private_subnet_cidrs[count.index]
+  availability_zone = data.aws_availability_zones.available.names[count.index]
 
   tags = {
-    Name = "${local.name_prefix}-private-${count.index + 1}"
-    Type = "Private"
+    Name = "${var.project_name}-${var.environment}-private-${count.index + 1}"
+    Type = "private"
   }
 }
 
 resource "aws_eip" "nat" {
-  count  = length(var.availability_zones)
+  count  = var.enable_nat_gateway ? 1 : 0
   domain = "vpc"
 
   tags = {
-    Name = "${local.name_prefix}-nat-eip-${count.index + 1}"
+    Name = "${var.project_name}-${var.environment}-nat-eip"
   }
+
+  depends_on = [aws_internet_gateway.main]
 }
 
 resource "aws_nat_gateway" "main" {
-  count         = length(var.availability_zones)
-  allocation_id = aws_eip.nat[count.index].id
-  subnet_id     = aws_subnet.public[count.index].id
+  count         = var.enable_nat_gateway ? 1 : 0
+  allocation_id = aws_eip.nat[0].id
+  subnet_id     = aws_subnet.public[0].id
 
   tags = {
-    Name = "${local.name_prefix}-nat-${count.index + 1}"
+    Name = "${var.project_name}-${var.environment}-nat"
   }
 
   depends_on = [aws_internet_gateway.main]
@@ -111,47 +126,49 @@ resource "aws_route_table" "public" {
   }
 
   tags = {
-    Name = "${local.name_prefix}-public-rt"
+    Name = "${var.project_name}-${var.environment}-public-rt"
   }
 }
 
 resource "aws_route_table" "private" {
-  count  = length(var.availability_zones)
   vpc_id = aws_vpc.main.id
 
-  route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.main[count.index].id
+  dynamic "route" {
+    for_each = var.enable_nat_gateway ? [1] : []
+    content {
+      cidr_block     = "0.0.0.0/0"
+      nat_gateway_id = aws_nat_gateway.main[0].id
+    }
   }
 
   tags = {
-    Name = "${local.name_prefix}-private-rt-${count.index + 1}"
+    Name = "${var.project_name}-${var.environment}-private-rt"
   }
 }
 
 resource "aws_route_table_association" "public" {
-  count          = length(var.availability_zones)
+  count          = length(aws_subnet.public)
   subnet_id      = aws_subnet.public[count.index].id
   route_table_id = aws_route_table.public.id
 }
 
 resource "aws_route_table_association" "private" {
-  count          = length(var.availability_zones)
+  count          = length(aws_subnet.private)
   subnet_id      = aws_subnet.private[count.index].id
-  route_table_id = aws_route_table.private[count.index].id
+  route_table_id = aws_route_table.private.id
 }
 
-# ============================================================================
+# =============================================================================
 # SECURITY GROUPS
-# ============================================================================
+# =============================================================================
 
 resource "aws_security_group" "alb" {
-  name        = "${local.name_prefix}-alb-sg"
+  name        = "${var.project_name}-${var.environment}-alb-sg"
   description = "Security group for Application Load Balancer"
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description = "HTTP"
+    description = "HTTP from anywhere"
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
@@ -159,7 +176,7 @@ resource "aws_security_group" "alb" {
   }
 
   ingress {
-    description = "HTTPS"
+    description = "HTTPS from anywhere"
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
@@ -174,38 +191,21 @@ resource "aws_security_group" "alb" {
   }
 
   tags = {
-    Name = "${local.name_prefix}-alb-sg"
+    Name = "${var.project_name}-${var.environment}-alb-sg"
   }
 }
 
-resource "aws_security_group" "ecs_tasks" {
-  name        = "${local.name_prefix}-ecs-tasks-sg"
-  description = "Security group for ECS tasks"
+resource "aws_security_group" "ecs_frontend" {
+  name        = "${var.project_name}-${var.environment}-frontend-sg"
+  description = "Security group for frontend ECS tasks"
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description     = "Frontend from ALB"
-    from_port       = 3000
-    to_port         = 3000
+    description     = "Traffic from ALB"
+    from_port       = var.frontend_container_port
+    to_port         = var.frontend_container_port
     protocol        = "tcp"
     security_groups = [aws_security_group.alb.id]
-  }
-
-  ingress {
-    description     = "Backend Python from ALB"
-    from_port       = 8000
-    to_port         = 8000
-    protocol        = "tcp"
-    security_groups = [aws_security_group.alb.id]
-  }
-
-  # Allow communication between services
-  ingress {
-    description = "Inter-service communication"
-    from_port   = 0
-    to_port     = 65535
-    protocol    = "tcp"
-    self        = true
   }
 
   egress {
@@ -216,41 +216,81 @@ resource "aws_security_group" "ecs_tasks" {
   }
 
   tags = {
-    Name = "${local.name_prefix}-ecs-tasks-sg"
+    Name = "${var.project_name}-${var.environment}-frontend-sg"
   }
 }
 
-# ============================================================================
+resource "aws_security_group" "ecs_backend" {
+  name        = "${var.project_name}-${var.environment}-backend-sg"
+  description = "Security group for backend ECS tasks"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    description     = "Traffic from ALB"
+    from_port       = var.backend_container_port
+    to_port         = var.backend_container_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb.id]
+  }
+
+  ingress {
+    description     = "Traffic from frontend"
+    from_port       = var.backend_container_port
+    to_port         = var.backend_container_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.ecs_frontend.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-backend-sg"
+  }
+}
+
+# =============================================================================
 # ECR REPOSITORIES
-# ============================================================================
+# =============================================================================
 
 resource "aws_ecr_repository" "frontend" {
-  name                 = "${local.name_prefix}/frontend"
+  name                 = "${var.project_name}-${var.environment}-frontend"
   image_tag_mutability = "MUTABLE"
 
   image_scanning_configuration {
     scan_on_push = true
   }
 
+  encryption_configuration {
+    encryption_type = "AES256"
+  }
+
   tags = {
-    Name = "${local.name_prefix}-frontend-ecr"
+    Name = "${var.project_name}-${var.environment}-frontend"
   }
 }
 
-resource "aws_ecr_repository" "backend_python" {
-  name                 = "${local.name_prefix}/backend-python"
+resource "aws_ecr_repository" "backend" {
+  name                 = "${var.project_name}-${var.environment}-backend"
   image_tag_mutability = "MUTABLE"
 
   image_scanning_configuration {
     scan_on_push = true
   }
 
+  encryption_configuration {
+    encryption_type = "AES256"
+  }
+
   tags = {
-    Name = "${local.name_prefix}-backend-python-ecr"
+    Name = "${var.project_name}-${var.environment}-backend"
   }
 }
 
-# ECR Lifecycle policies to clean up old images
 resource "aws_ecr_lifecycle_policy" "frontend" {
   repository = aws_ecr_repository.frontend.name
 
@@ -272,8 +312,8 @@ resource "aws_ecr_lifecycle_policy" "frontend" {
   })
 }
 
-resource "aws_ecr_lifecycle_policy" "backend_python" {
-  repository = aws_ecr_repository.backend_python.name
+resource "aws_ecr_lifecycle_policy" "backend" {
+  repository = aws_ecr_repository.backend.name
 
   policy = jsonencode({
     rules = [
@@ -293,57 +333,20 @@ resource "aws_ecr_lifecycle_policy" "backend_python" {
   })
 }
 
-# ============================================================================
-# AWS CLOUD MAP (SERVICE DISCOVERY)
-# ============================================================================
-
-resource "aws_service_discovery_private_dns_namespace" "main" {
-  name        = "${local.name_prefix}.local"
-  description = "Private DNS namespace for service discovery"
-  vpc         = aws_vpc.main.id
-
-  tags = {
-    Name = "${local.name_prefix}-service-discovery"
-  }
-}
-
-resource "aws_service_discovery_service" "backend_python" {
-  name = "backend-python"
-
-  dns_config {
-    namespace_id = aws_service_discovery_private_dns_namespace.main.id
-
-    dns_records {
-      ttl  = 10
-      type = "A"
-    }
-
-    routing_policy = "MULTIVALUE"
-  }
-
-  health_check_custom_config {
-    failure_threshold = 1
-  }
-
-  tags = {
-    Name = "${local.name_prefix}-backend-python-discovery"
-  }
-}
-
-# ============================================================================
+# =============================================================================
 # ECS CLUSTER
-# ============================================================================
+# =============================================================================
 
 resource "aws_ecs_cluster" "main" {
-  name = "${local.name_prefix}-cluster"
+  name = "${var.project_name}-${var.environment}-cluster"
 
   setting {
     name  = "containerInsights"
-    value = "enabled"
+    value = var.enable_container_insights ? "enabled" : "disabled"
   }
 
   tags = {
-    Name = "${local.name_prefix}-cluster"
+    Name = "${var.project_name}-${var.environment}-cluster"
   }
 }
 
@@ -355,28 +358,33 @@ resource "aws_ecs_cluster_capacity_providers" "main" {
   default_capacity_provider_strategy {
     base              = 1
     weight            = 100
-    capacity_provider = "FARGATE"
+    capacity_provider = var.use_fargate_spot ? "FARGATE_SPOT" : "FARGATE"
   }
 }
 
-# ============================================================================
+# =============================================================================
 # IAM ROLES
-# ============================================================================
-
-data "aws_iam_policy_document" "ecs_task_assume_role" {
-  statement {
-    actions = ["sts:AssumeRole"]
-
-    principals {
-      type        = "Service"
-      identifiers = ["ecs-tasks.amazonaws.com"]
-    }
-  }
-}
+# =============================================================================
 
 resource "aws_iam_role" "ecs_task_execution" {
-  name               = "${local.name_prefix}-ecs-task-execution"
-  assume_role_policy = data.aws_iam_policy_document.ecs_task_assume_role.json
+  name = "${var.project_name}-${var.environment}-ecs-execution-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ecs-tasks.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-ecs-execution-role"
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "ecs_task_execution" {
@@ -384,9 +392,8 @@ resource "aws_iam_role_policy_attachment" "ecs_task_execution" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
-# Allow reading secrets from Secrets Manager
 resource "aws_iam_role_policy" "ecs_task_execution_secrets" {
-  name = "${local.name_prefix}-ecs-secrets-policy"
+  name = "${var.project_name}-${var.environment}-secrets-policy"
   role = aws_iam_role.ecs_task_execution.id
 
   policy = jsonencode({
@@ -395,90 +402,81 @@ resource "aws_iam_role_policy" "ecs_task_execution_secrets" {
       {
         Effect = "Allow"
         Action = [
-          "secretsmanager:GetSecretValue"
+          "secretsmanager:GetSecretValue",
+          "ssm:GetParameters",
+          "ssm:GetParameter"
         ]
-        Resource = [
-          aws_secretsmanager_secret.app_secrets.arn
-        ]
+        Resource = "*"
       }
     ]
   })
 }
 
 resource "aws_iam_role" "ecs_task" {
-  name               = "${local.name_prefix}-ecs-task"
-  assume_role_policy = data.aws_iam_policy_document.ecs_task_assume_role.json
-}
+  name = "${var.project_name}-${var.environment}-ecs-task-role"
 
-# ============================================================================
-# SECRETS MANAGER
-# ============================================================================
-
-resource "aws_secretsmanager_secret" "app_secrets" {
-  name = "${local.name_prefix}-secrets"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ecs-tasks.amazonaws.com"
+        }
+      }
+    ]
+  })
 
   tags = {
-    Name = "${local.name_prefix}-secrets"
+    Name = "${var.project_name}-${var.environment}-ecs-task-role"
   }
 }
 
-resource "aws_secretsmanager_secret_version" "app_secrets" {
-  secret_id = aws_secretsmanager_secret.app_secrets.id
-
-  secret_string = jsonencode({
-    OPENAI_API_KEY       = var.openai_api_key
-    TAVILY_API_KEY       = var.tavily_api_key
-    MONGODB_URI          = var.mongodb_uri
-    MONGODB_DATABASE     = var.mongodb_database
-    SUPABASE_URL         = var.supabase_url
-    SUPABASE_SERVICE_KEY = var.supabase_service_key
-  })
-}
-
-# ============================================================================
+# =============================================================================
 # CLOUDWATCH LOG GROUPS
-# ============================================================================
+# =============================================================================
 
 resource "aws_cloudwatch_log_group" "frontend" {
-  name              = "/ecs/${local.name_prefix}/frontend"
-  retention_in_days = 30
+  name              = "/ecs/${var.project_name}-${var.environment}/frontend"
+  retention_in_days = var.log_retention_days
 
   tags = {
-    Name = "${local.name_prefix}-frontend-logs"
+    Name = "${var.project_name}-${var.environment}-frontend-logs"
   }
 }
 
-resource "aws_cloudwatch_log_group" "backend_python" {
-  name              = "/ecs/${local.name_prefix}/backend-python"
-  retention_in_days = 30
+resource "aws_cloudwatch_log_group" "backend" {
+  name              = "/ecs/${var.project_name}-${var.environment}/backend"
+  retention_in_days = var.log_retention_days
 
   tags = {
-    Name = "${local.name_prefix}-backend-python-logs"
+    Name = "${var.project_name}-${var.environment}-backend-logs"
   }
 }
 
-# ============================================================================
+# =============================================================================
 # APPLICATION LOAD BALANCER
-# ============================================================================
+# =============================================================================
 
 resource "aws_lb" "main" {
-  name               = "${local.name_prefix}-alb"
+  name               = "${var.project_name}-${var.environment}-alb"
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb.id]
   subnets            = aws_subnet.public[*].id
 
-  enable_deletion_protection = false
+  enable_deletion_protection = var.environment == "production"
 
   tags = {
-    Name = "${local.name_prefix}-alb"
+    Name = "${var.project_name}-${var.environment}-alb"
   }
 }
 
 # Frontend Target Group
 resource "aws_lb_target_group" "frontend" {
-  name        = "${local.name_prefix}-frontend-tg"
-  port        = 3000
+  name        = "${var.project_name}-${var.environment}-frontend-tg"
+  port        = var.frontend_container_port
   protocol    = "HTTP"
   vpc_id      = aws_vpc.main.id
   target_type = "ip"
@@ -486,24 +484,24 @@ resource "aws_lb_target_group" "frontend" {
   health_check {
     enabled             = true
     healthy_threshold   = 2
+    unhealthy_threshold = 3
+    timeout             = 10
     interval            = 30
-    matcher             = "200"
     path                = "/"
     port                = "traffic-port"
     protocol            = "HTTP"
-    timeout             = 5
-    unhealthy_threshold = 3
+    matcher             = "200-399"
   }
 
   tags = {
-    Name = "${local.name_prefix}-frontend-tg"
+    Name = "${var.project_name}-${var.environment}-frontend-tg"
   }
 }
 
-# Backend Python Target Group
-resource "aws_lb_target_group" "backend_python" {
-  name        = "${local.name_prefix}-backend-python-tg"
-  port        = 8000
+# Backend Target Group
+resource "aws_lb_target_group" "backend" {
+  name        = "${var.project_name}-${var.environment}-backend-tg"
+  port        = var.backend_container_port
   protocol    = "HTTP"
   vpc_id      = aws_vpc.main.id
   target_type = "ip"
@@ -511,21 +509,21 @@ resource "aws_lb_target_group" "backend_python" {
   health_check {
     enabled             = true
     healthy_threshold   = 2
+    unhealthy_threshold = 3
+    timeout             = 10
     interval            = 30
-    matcher             = "200"
     path                = "/health"
     port                = "traffic-port"
     protocol            = "HTTP"
-    timeout             = 5
-    unhealthy_threshold = 3
+    matcher             = "200"
   }
 
   tags = {
-    Name = "${local.name_prefix}-backend-python-tg"
+    Name = "${var.project_name}-${var.environment}-backend-tg"
   }
 }
 
-# HTTP Listener (redirects to HTTPS in production, serves directly for dev)
+# HTTP Listener (redirects to HTTPS in production)
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.main.arn
   port              = 80
@@ -537,48 +535,29 @@ resource "aws_lb_listener" "http" {
   }
 }
 
-# Path-based routing for API endpoints  
-# Note: This routes /api/* to Python backend directly
-# If you want Next.js API routes to handle requests, remove this rule
-# and ensure BACKEND_URL uses service discovery instead of ALB
-resource "aws_lb_listener_rule" "backend_python_api" {
+# Backend API Listener Rule
+resource "aws_lb_listener_rule" "backend_api" {
   listener_arn = aws_lb_listener.http.arn
-  priority     = 80
+  priority     = 100
 
   action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.backend_python.arn
+    target_group_arn = aws_lb_target_group.backend.arn
   }
 
   condition {
     path_pattern {
-      values = ["/api/*"]
+      values = ["/api/*", "/health", "/docs", "/openapi.json"]
     }
   }
 }
 
-resource "aws_lb_listener_rule" "backend_python_agent" {
-  listener_arn = aws_lb_listener.http.arn
-  priority     = 90
-
-  action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.backend_python.arn
-  }
-
-  condition {
-    path_pattern {
-      values = ["/agent/*", "/agent-api/*"]
-    }
-  }
-}
-
-# ============================================================================
+# =============================================================================
 # ECS TASK DEFINITIONS
-# ============================================================================
+# =============================================================================
 
 resource "aws_ecs_task_definition" "frontend" {
-  family                   = "${local.name_prefix}-frontend"
+  family                   = "${var.project_name}-${var.environment}-frontend"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
   cpu                      = var.frontend_cpu
@@ -588,13 +567,13 @@ resource "aws_ecs_task_definition" "frontend" {
 
   container_definitions = jsonencode([
     {
-      name      = "frontend"
-      image     = "${aws_ecr_repository.frontend.repository_url}:latest"
-      essential = true
+      name  = "frontend"
+      image = "${aws_ecr_repository.frontend.repository_url}:${var.frontend_image_tag}"
 
       portMappings = [
         {
-          containerPort = 3000
+          containerPort = var.frontend_container_port
+          hostPort      = var.frontend_container_port
           protocol      = "tcp"
         }
       ]
@@ -602,19 +581,15 @@ resource "aws_ecs_task_definition" "frontend" {
       environment = [
         {
           name  = "NODE_ENV"
-          value = "production"
+          value = var.environment == "production" ? "production" : "development"
         },
         {
           name  = "NEXT_PUBLIC_API_URL"
-          value = "http://${aws_lb.main.dns_name}"
+          value = "http://${aws_lb.main.dns_name}/api"
         },
         {
           name  = "NEXT_PUBLIC_PYTHON_API_URL"
-          value = "http://${aws_lb.main.dns_name}/agent-api"
-        },
-        {
-          name  = "BACKEND_URL"
-          value = "http://backend-python.${aws_service_discovery_private_dns_namespace.main.name}:8000"
+          value = "http://${aws_lb.main.dns_name}"
         }
       ]
 
@@ -623,35 +598,45 @@ resource "aws_ecs_task_definition" "frontend" {
         options = {
           "awslogs-group"         = aws_cloudwatch_log_group.frontend.name
           "awslogs-region"        = var.aws_region
-          "awslogs-stream-prefix" = "ecs"
+          "awslogs-stream-prefix" = "frontend"
         }
       }
+
+      healthCheck = {
+        command     = ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:${var.frontend_container_port} || exit 1"]
+        interval    = 30
+        timeout     = 10
+        retries     = 3
+        startPeriod = 60
+      }
+
+      essential = true
     }
   ])
 
   tags = {
-    Name = "${local.name_prefix}-frontend-task"
+    Name = "${var.project_name}-${var.environment}-frontend-task"
   }
 }
 
-resource "aws_ecs_task_definition" "backend_python" {
-  family                   = "${local.name_prefix}-backend-python"
+resource "aws_ecs_task_definition" "backend" {
+  family                   = "${var.project_name}-${var.environment}-backend"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = var.backend_python_cpu
-  memory                   = var.backend_python_memory
+  cpu                      = var.backend_cpu
+  memory                   = var.backend_memory
   execution_role_arn       = aws_iam_role.ecs_task_execution.arn
   task_role_arn            = aws_iam_role.ecs_task.arn
 
   container_definitions = jsonencode([
     {
-      name      = "backend-python"
-      image     = "${aws_ecr_repository.backend_python.repository_url}:latest"
-      essential = true
+      name  = "backend"
+      image = "${aws_ecr_repository.backend.repository_url}:${var.backend_image_tag}"
 
       portMappings = [
         {
-          containerPort = 8000
+          containerPort = var.backend_container_port
+          hostPort      = var.backend_container_port
           protocol      = "tcp"
         }
       ]
@@ -663,106 +648,212 @@ resource "aws_ecs_task_definition" "backend_python" {
         },
         {
           name  = "PORT"
-          value = "8000"
+          value = tostring(var.backend_container_port)
         },
         {
           name  = "DEBUG"
-          value = "false"
+          value = var.environment == "production" ? "false" : "true"
+        },
+        {
+          name  = "MONGODB_DATABASE"
+          value = var.mongodb_database
         }
       ]
 
       secrets = [
         {
           name      = "OPENAI_API_KEY"
-          valueFrom = "${aws_secretsmanager_secret.app_secrets.arn}:OPENAI_API_KEY::"
+          valueFrom = var.openai_api_key_secret_arn
         },
         {
           name      = "TAVILY_API_KEY"
-          valueFrom = "${aws_secretsmanager_secret.app_secrets.arn}:TAVILY_API_KEY::"
+          valueFrom = var.tavily_api_key_secret_arn
         },
         {
           name      = "MONGODB_URI"
-          valueFrom = "${aws_secretsmanager_secret.app_secrets.arn}:MONGODB_URI::"
-        },
-        {
-          name      = "MONGODB_DATABASE"
-          valueFrom = "${aws_secretsmanager_secret.app_secrets.arn}:MONGODB_DATABASE::"
+          valueFrom = var.mongodb_uri_secret_arn
         }
       ]
 
       logConfiguration = {
         logDriver = "awslogs"
         options = {
-          "awslogs-group"         = aws_cloudwatch_log_group.backend_python.name
+          "awslogs-group"         = aws_cloudwatch_log_group.backend.name
           "awslogs-region"        = var.aws_region
-          "awslogs-stream-prefix" = "ecs"
+          "awslogs-stream-prefix" = "backend"
         }
       }
+
+      healthCheck = {
+        command     = ["CMD-SHELL", "curl -f http://localhost:${var.backend_container_port}/health || exit 1"]
+        interval    = 30
+        timeout     = 10
+        retries     = 3
+        startPeriod = 60
+      }
+
+      essential = true
     }
   ])
 
   tags = {
-    Name = "${local.name_prefix}-backend-python-task"
+    Name = "${var.project_name}-${var.environment}-backend-task"
   }
 }
 
-# ============================================================================
+# =============================================================================
 # ECS SERVICES
-# ============================================================================
+# =============================================================================
 
 resource "aws_ecs_service" "frontend" {
-  name            = "${local.name_prefix}-frontend"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.frontend.arn
-  desired_count   = var.frontend_desired_count
-  launch_type     = "FARGATE"
+  name                               = "${var.project_name}-${var.environment}-frontend"
+  cluster                            = aws_ecs_cluster.main.id
+  task_definition                    = aws_ecs_task_definition.frontend.arn
+  desired_count                      = var.frontend_desired_count
+  launch_type                        = var.use_fargate_spot ? null : "FARGATE"
+  platform_version                   = "LATEST"
+  health_check_grace_period_seconds  = 120
+  deployment_minimum_healthy_percent = 50
+  deployment_maximum_percent         = 200
+
+  dynamic "capacity_provider_strategy" {
+    for_each = var.use_fargate_spot ? [1] : []
+    content {
+      capacity_provider = "FARGATE_SPOT"
+      weight            = 100
+    }
+  }
 
   network_configuration {
-    security_groups  = [aws_security_group.ecs_tasks.id]
-    subnets          = aws_subnet.private[*].id
-    assign_public_ip = false
+    subnets          = var.enable_nat_gateway ? aws_subnet.private[*].id : aws_subnet.public[*].id
+    security_groups  = [aws_security_group.ecs_frontend.id]
+    assign_public_ip = var.enable_nat_gateway ? false : true
   }
 
   load_balancer {
     target_group_arn = aws_lb_target_group.frontend.arn
     container_name   = "frontend"
-    container_port   = 3000
+    container_port   = var.frontend_container_port
+  }
+
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
   }
 
   depends_on = [aws_lb_listener.http]
 
   tags = {
-    Name = "${local.name_prefix}-frontend-service"
+    Name = "${var.project_name}-${var.environment}-frontend-service"
+  }
+
+  lifecycle {
+    ignore_changes = [desired_count]
   }
 }
 
-resource "aws_ecs_service" "backend_python" {
-  name            = "${local.name_prefix}-backend-python"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.backend_python.arn
-  desired_count   = var.backend_python_desired_count
-  launch_type     = "FARGATE"
+resource "aws_ecs_service" "backend" {
+  name                               = "${var.project_name}-${var.environment}-backend"
+  cluster                            = aws_ecs_cluster.main.id
+  task_definition                    = aws_ecs_task_definition.backend.arn
+  desired_count                      = var.backend_desired_count
+  launch_type                        = var.use_fargate_spot ? null : "FARGATE"
+  platform_version                   = "LATEST"
+  health_check_grace_period_seconds  = 120
+  deployment_minimum_healthy_percent = 50
+  deployment_maximum_percent         = 200
+
+  dynamic "capacity_provider_strategy" {
+    for_each = var.use_fargate_spot ? [1] : []
+    content {
+      capacity_provider = "FARGATE_SPOT"
+      weight            = 100
+    }
+  }
 
   network_configuration {
-    security_groups  = [aws_security_group.ecs_tasks.id]
-    subnets          = aws_subnet.private[*].id
-    assign_public_ip = false
+    subnets          = var.enable_nat_gateway ? aws_subnet.private[*].id : aws_subnet.public[*].id
+    security_groups  = [aws_security_group.ecs_backend.id]
+    assign_public_ip = var.enable_nat_gateway ? false : true
   }
 
   load_balancer {
-    target_group_arn = aws_lb_target_group.backend_python.arn
-    container_name   = "backend-python"
-    container_port   = 8000
+    target_group_arn = aws_lb_target_group.backend.arn
+    container_name   = "backend"
+    container_port   = var.backend_container_port
   }
 
-  service_registries {
-    registry_arn = aws_service_discovery_service.backend_python.arn
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
   }
 
   depends_on = [aws_lb_listener.http]
 
   tags = {
-    Name = "${local.name_prefix}-backend-python-service"
+    Name = "${var.project_name}-${var.environment}-backend-service"
+  }
+
+  lifecycle {
+    ignore_changes = [desired_count]
+  }
+}
+
+# =============================================================================
+# AUTO SCALING
+# =============================================================================
+
+resource "aws_appautoscaling_target" "frontend" {
+  count              = var.enable_autoscaling ? 1 : 0
+  max_capacity       = var.frontend_max_count
+  min_capacity       = var.frontend_desired_count
+  resource_id        = "service/${aws_ecs_cluster.main.name}/${aws_ecs_service.frontend.name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  service_namespace  = "ecs"
+}
+
+resource "aws_appautoscaling_policy" "frontend_cpu" {
+  count              = var.enable_autoscaling ? 1 : 0
+  name               = "${var.project_name}-${var.environment}-frontend-cpu-scaling"
+  policy_type        = "TargetTrackingScaling"
+  resource_id        = aws_appautoscaling_target.frontend[0].resource_id
+  scalable_dimension = aws_appautoscaling_target.frontend[0].scalable_dimension
+  service_namespace  = aws_appautoscaling_target.frontend[0].service_namespace
+
+  target_tracking_scaling_policy_configuration {
+    predefined_metric_specification {
+      predefined_metric_type = "ECSServiceAverageCPUUtilization"
+    }
+    target_value       = 70.0
+    scale_in_cooldown  = 300
+    scale_out_cooldown = 60
+  }
+}
+
+resource "aws_appautoscaling_target" "backend" {
+  count              = var.enable_autoscaling ? 1 : 0
+  max_capacity       = var.backend_max_count
+  min_capacity       = var.backend_desired_count
+  resource_id        = "service/${aws_ecs_cluster.main.name}/${aws_ecs_service.backend.name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  service_namespace  = "ecs"
+}
+
+resource "aws_appautoscaling_policy" "backend_cpu" {
+  count              = var.enable_autoscaling ? 1 : 0
+  name               = "${var.project_name}-${var.environment}-backend-cpu-scaling"
+  policy_type        = "TargetTrackingScaling"
+  resource_id        = aws_appautoscaling_target.backend[0].resource_id
+  scalable_dimension = aws_appautoscaling_target.backend[0].scalable_dimension
+  service_namespace  = aws_appautoscaling_target.backend[0].service_namespace
+
+  target_tracking_scaling_policy_configuration {
+    predefined_metric_specification {
+      predefined_metric_type = "ECSServiceAverageCPUUtilization"
+    }
+    target_value       = 70.0
+    scale_in_cooldown  = 300
+    scale_out_cooldown = 60
   }
 }
 

@@ -1,86 +1,84 @@
-# AWS Infrastructure for AI Agent
+# AI-Agent AWS Infrastructure
 
-This directory contains Terraform configurations for deploying the AI Agent application to AWS ECS (Elastic Container Service).
+This directory contains Terraform configurations for deploying the AI-Agent application to AWS using ECS (Elastic Container Service) with Fargate.
 
 ## Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                           VPC (10.0.0.0/16)                         │
-│  ┌──────────────────────────────────────────────────────────────┐  │
-│  │                      Public Subnets                           │  │
-│  │  ┌─────────────────┐              ┌─────────────────────────┐ │  │
-│  │  │  NAT Gateway    │              │  Application Load       │ │  │
-│  │  │  (AZ-1)         │              │  Balancer (ALB)        │ │  │
-│  │  └─────────────────┘              └─────────────────────────┘ │  │
-│  └──────────────────────────────────────────────────────────────┘  │
-│  ┌──────────────────────────────────────────────────────────────┐  │
-│  │                      Private Subnets                          │  │
-│  │  ┌───────────────┐ ┌───────────────┐ ┌───────────────────┐   │  │
-│  │  │   Frontend    │ │ Backend Node  │ │  Backend Python   │   │  │
-│  │  │   (Next.js)   │ │  (Express)    │ │   (FastAPI)       │   │  │
-│  │  │   :3000       │ │    :3001      │ │     :8000         │   │  │
-│  │  └───────────────┘ └───────────────┘ └───────────────────┘   │  │
-│  │                         ECS Fargate                           │  │
-│  └──────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────┘
-                                    │
-                    ┌───────────────┴───────────────┐
-                    │     External Services         │
-                    │  - Supabase (PostgreSQL)      │
-                    │  - MongoDB Atlas              │
-                    │  - OpenAI API                 │
-                    │  - Tavily API                 │
-                    └───────────────────────────────┘
+                    ┌─────────────────────────────────────────────────────┐
+                    │                      AWS VPC                         │
+                    │                                                      │
+┌──────────┐       │  ┌─────────────────────────────────────────────────┐ │
+│          │       │  │              Application Load Balancer          │ │
+│ Internet │◄─────►│  │                   (Port 80/443)                 │ │
+│          │       │  └─────────────────┬───────────────┬───────────────┘ │
+└──────────┘       │                    │               │                 │
+                    │                    ▼               ▼                 │
+                    │  ┌─────────────────────┐ ┌─────────────────────────┐│
+                    │  │   Frontend Service  │ │    Backend Service      ││
+                    │  │   (Next.js :3000)   │ │   (FastAPI :8000)       ││
+                    │  │                     │ │                         ││
+                    │  │  ┌───────────────┐  │ │  ┌───────────────────┐  ││
+                    │  │  │ ECS Fargate   │  │ │  │   ECS Fargate     │  ││
+                    │  │  │    Task       │  │ │  │      Task         │  ││
+                    │  │  └───────────────┘  │ │  └───────────────────┘  ││
+                    │  └─────────────────────┘ └─────────────────────────┘│
+                    │                                                      │
+                    │  ┌─────────────────────┐ ┌─────────────────────────┐│
+                    │  │   ECR Repository    │ │    ECR Repository       ││
+                    │  │     (Frontend)      │ │      (Backend)          ││
+                    │  └─────────────────────┘ └─────────────────────────┘│
+                    └─────────────────────────────────────────────────────┘
 ```
-
-## Components Created
-
-- **VPC** with public and private subnets across 2 availability zones
-- **NAT Gateways** for outbound internet access from private subnets
-- **Application Load Balancer** with path-based routing
-- **ECR Repositories** for container images
-- **ECS Cluster** with Fargate capacity provider
-- **ECS Services** for frontend, backend-node, and backend-python
-- **Secrets Manager** for sensitive configuration
-- **CloudWatch Log Groups** for container logs
-- **Security Groups** for ALB and ECS tasks
 
 ## Prerequisites
 
-1. **AWS CLI** configured with appropriate credentials
-2. **Terraform** >= 1.0 installed
-3. **Docker** for building container images locally
+1. **AWS CLI** installed and configured with appropriate credentials
+2. **Terraform** v1.0 or later installed
+3. **Docker** installed for building container images
+4. AWS Secrets Manager secrets created for API keys
 
 ## Quick Start
 
-### 1. Initialize Terraform
+### 1. Create AWS Secrets
+
+First, create the required secrets in AWS Secrets Manager:
+
+```bash
+# OpenAI API Key
+aws secretsmanager create-secret \
+  --name ai-agent/openai-api-key \
+  --secret-string "sk-your-openai-key"
+
+# Tavily API Key
+aws secretsmanager create-secret \
+  --name ai-agent/tavily-api-key \
+  --secret-string "tvly-your-tavily-key"
+
+# MongoDB URI
+aws secretsmanager create-secret \
+  --name ai-agent/mongodb-uri \
+  --secret-string "mongodb+srv://user:pass@cluster.mongodb.net"
+```
+
+### 2. Configure Terraform
 
 ```bash
 cd infrastructure/terraform
-terraform init
-```
 
-### 2. Create secrets file
-
-```bash
+# Copy example variables file
 cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars with your actual values
+
+# Edit terraform.tfvars with your values
+# Update the secret ARNs and other configuration
 ```
 
-Or use environment variables:
+### 3. Deploy Infrastructure
 
 ```bash
-export TF_VAR_openai_api_key="your-openai-key"
-export TF_VAR_tavily_api_key="your-tavily-key"
-export TF_VAR_mongodb_uri="mongodb+srv://..."
-export TF_VAR_supabase_url="https://xxx.supabase.co"
-export TF_VAR_supabase_service_key="your-service-key"
-```
+# Initialize Terraform
+terraform init
 
-### 3. Plan and Apply
-
-```bash
 # Preview changes
 terraform plan
 
@@ -88,138 +86,153 @@ terraform plan
 terraform apply
 ```
 
-### 4. Build and Push Container Images
+### 4. Build and Push Docker Images
 
-After Terraform creates the ECR repositories, build and push your images:
+After the infrastructure is created, build and push your container images:
 
 ```bash
-# Get ECR repository URLs from Terraform output
-terraform output ecr_frontend_repository_url
-terraform output ecr_backend_node_repository_url
-terraform output ecr_backend_python_repository_url
-
-# Login to ECR
-aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin <account-id>.dkr.ecr.us-east-1.amazonaws.com
+# Get ECR login credentials
+aws ecr get-login-password --region us-east-1 | \
+  docker login --username AWS --password-stdin YOUR_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com
 
 # Build and push frontend
-cd ../../packages/frontend
-docker build -t <frontend-ecr-url>:latest .
-docker push <frontend-ecr-url>:latest
+docker build -t YOUR_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/ai-agent-dev-frontend:latest ./packages/frontend
+docker push YOUR_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/ai-agent-dev-frontend:latest
 
-# Build and push backend-node
-cd ../backend
-docker build -t <backend-node-ecr-url>:latest .
-docker push <backend-node-ecr-url>:latest
-
-# Build and push backend-python
-cd ../backend-python
-docker build -t <backend-python-ecr-url>:latest .
-docker push <backend-python-ecr-url>:latest
+# Build and push backend
+docker build -t YOUR_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/ai-agent-dev-backend:latest ./packages/backend
+docker push YOUR_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/ai-agent-dev-backend:latest
 ```
 
-### 5. Access Your Application
+### 5. Force ECS Deployment
 
 ```bash
-terraform output alb_url
+# Deploy new images
+aws ecs update-service --cluster ai-agent-dev-cluster --service ai-agent-dev-frontend --force-new-deployment
+aws ecs update-service --cluster ai-agent-dev-cluster --service ai-agent-dev-backend --force-new-deployment
 ```
 
-## URL Routing
+## Configuration Options
 
-The Application Load Balancer routes traffic based on path:
+### Cost Optimization
 
-| Path Pattern | Target |
-|--------------|--------|
-| `/` (default) | Frontend (Next.js) |
-| `/api/*` | Backend Python (FastAPI) |
-| `/agent/*` | Backend Python (FastAPI) |
-| `/agent-api/*` | Backend Python (FastAPI) |
-
-## Environment Variables
-
-### Frontend
-- `NODE_ENV` - production
-- `NEXT_PUBLIC_API_URL` - Application Load Balancer URL (routes to Backend Python)
-- `NEXT_PUBLIC_PYTHON_API_URL` - Application Load Balancer URL with /agent-api path
-
-### Backend Python
-- `HOST` - 0.0.0.0
-- `PORT` - 8000
-- `DEBUG` - false
-- `OPENAI_API_KEY` - From Secrets Manager
-- `TAVILY_API_KEY` - From Secrets Manager
-- `MONGODB_URI` - From Secrets Manager
-- `MONGODB_DATABASE` - From Secrets Manager
-
-## Scaling
-
-Adjust the desired count variables in `terraform.tfvars`:
+For development/testing, use these settings to minimize costs:
 
 ```hcl
-frontend_desired_count       = 2
-backend_python_desired_count = 2
+enable_nat_gateway        = false  # Uses public subnets instead
+enable_container_insights = false  # Disable CloudWatch insights
+enable_autoscaling        = false  # Fixed number of tasks
+use_fargate_spot          = true   # Up to 70% cost savings
+frontend_cpu              = 256    # Minimum CPU
+frontend_memory           = 512    # Minimum memory
+backend_cpu               = 256
+backend_memory            = 512
+frontend_desired_count    = 1
+backend_desired_count     = 1
 ```
 
-Or scale manually via AWS CLI:
+### Production Settings
 
-```bash
-aws ecs update-service \
-  --cluster ai-agent-prod-cluster \
-  --service ai-agent-prod-frontend \
-  --desired-count 3
+For production workloads:
+
+```hcl
+environment               = "production"
+enable_nat_gateway        = true   # Enhanced security
+enable_container_insights = true   # Full monitoring
+enable_autoscaling        = true   # Handle traffic spikes
+use_fargate_spot          = false  # Reliable capacity
+frontend_cpu              = 512
+frontend_memory           = 1024
+backend_cpu               = 1024
+backend_memory            = 2048
+frontend_desired_count    = 2      # High availability
+backend_desired_count     = 2
 ```
 
-## Monitoring
+## Estimated Costs
 
-### View Logs
+| Component | Dev (min) | Production |
+|-----------|-----------|------------|
+| ALB | ~$16/month | ~$16/month |
+| ECS Fargate (frontend) | ~$10/month | ~$40/month |
+| ECS Fargate (backend) | ~$15/month | ~$60/month |
+| NAT Gateway | $0 | ~$32/month |
+| CloudWatch Logs | ~$1/month | ~$5/month |
+| **Total** | **~$42/month** | **~$153/month** |
 
-```bash
-# Frontend logs
-aws logs tail /ecs/ai-agent-prod/frontend --follow
+*Using Fargate Spot can reduce compute costs by up to 70%*
 
-# Backend Python logs
-aws logs tail /ecs/ai-agent-prod/backend-python --follow
+## File Structure
+
+```
+infrastructure/terraform/
+├── main.tf                  # Main Terraform configuration
+├── variables.tf             # Variable definitions
+├── outputs.tf              # Output values
+├── terraform.tfvars.example # Example variable values
+└── README.md               # This file
 ```
 
-### Check Service Status
+## Terraform Outputs
 
-```bash
-aws ecs describe-services \
-  --cluster ai-agent-prod-cluster \
-  --services ai-agent-prod-frontend ai-agent-prod-backend-python
-```
+After applying, Terraform will output useful information:
 
-## Cost Optimization
-
-For development/staging environments:
-
-1. Use Fargate Spot for non-critical workloads
-2. Reduce desired count to 1
-3. Use smaller CPU/memory configurations
-4. Consider using a single NAT Gateway
-
-## Clean Up
-
-```bash
-# Destroy all resources
-terraform destroy
-```
-
-**Note:** Empty ECR repositories before destroying if you have images pushed.
+- `application_url` - URL to access the application
+- `api_url` - URL for the backend API
+- `frontend_ecr_repository_url` - ECR URL for frontend images
+- `backend_ecr_repository_url` - ECR URL for backend images
+- `ecr_login_command` - Command to authenticate with ECR
+- `update_services_command` - Command to force new deployments
 
 ## Troubleshooting
 
-### Task fails to start
-1. Check CloudWatch logs for error messages
-2. Verify secrets are correctly configured in Secrets Manager
-3. Ensure container images exist in ECR
+### ECS Tasks Not Starting
 
-### Health checks failing
-1. Verify the health check endpoints return 200 OK
-2. Check security group rules allow traffic on correct ports
-3. Review task definition port mappings
+1. Check CloudWatch logs:
+   ```bash
+   aws logs tail /ecs/ai-agent-dev/frontend --follow
+   aws logs tail /ecs/ai-agent-dev/backend --follow
+   ```
 
-### Connectivity issues
-1. Verify NAT Gateway is running
-2. Check route table associations
-3. Review security group ingress/egress rules
+2. Verify secrets are accessible:
+   ```bash
+   aws secretsmanager get-secret-value --secret-id ai-agent/openai-api-key
+   ```
+
+3. Check ECS task status:
+   ```bash
+   aws ecs describe-tasks --cluster ai-agent-dev-cluster --tasks $(aws ecs list-tasks --cluster ai-agent-dev-cluster --query 'taskArns[0]' --output text)
+   ```
+
+### Health Checks Failing
+
+1. Ensure your containers expose the correct health check endpoints:
+   - Frontend: `GET /` returns 200-399
+   - Backend: `GET /health` returns 200
+
+2. Check security group rules allow traffic from ALB
+
+### Image Push Failures
+
+1. Ensure Docker is authenticated with ECR
+2. Verify IAM permissions include ECR push access
+3. Check image size doesn't exceed limits
+
+## Cleanup
+
+To destroy all resources:
+
+```bash
+terraform destroy
+```
+
+**Warning**: This will delete all resources including the ECS cluster, ECR repositories (and images), and networking components.
+
+## Security Considerations
+
+- Secrets are stored in AWS Secrets Manager, not in Terraform state
+- ECS tasks use task roles with minimal permissions
+- Security groups restrict traffic to necessary ports only
+- ECR images are scanned on push for vulnerabilities
+- For production, enable HTTPS with ACM certificates
 
